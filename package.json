@@ -1,0 +1,32 @@
+{
+  "name": "bookmark",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --workspaces",
+    "build": "npm run build --workspaces",
+    "check-types": "npm run check-types --workspaces",
+    "dev:web": "npm run dev --workspace web",
+    "dev:server": "npm run dev --workspace server",
+    "db:push": "npm run db:push --workspace @bookmark/db",
+    "db:studio": "npm run db:studio --workspace @bookmark/db",
+    "db:generate": "npm run db:generate --workspace @bookmark/db",
+    "db:migrate": "npm run db:migrate --workspace @bookmark/db",
+    "db:local": "npm run db:local --workspace @bookmark/db"
+  },
+  "dependencies": {
+    "@bookmark/env": "*",
+    "dotenv": "^17.2.2",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@bookmark/config": "*",
+    "@types/node": "^22.13.14",
+    "typescript": "^5"
+  },
+  "packageManager": "npm@11.7.0"
+}

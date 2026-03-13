@@ -1,0 +1,3 @@
+{
+  "extends": "@bookmark/config/tsconfig.base.json"
+}
