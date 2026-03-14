@@ -11,7 +11,8 @@ import { authMiddleware } from "./middleware/auth";
 import { env } from "@bookmark/env/server";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const staticRoot = path.join(__dirname, "../../web/dist/client");
+const webDistPath = path.join(__dirname, "../../web/dist");
+const staticRoot = path.join(webDistPath, "client");
 
 export const app = new Hono();
 
@@ -37,9 +38,29 @@ app.route("/api/bookmarks", bookmarksRouter);
 app.use("/api/settings/*", authMiddleware);
 app.route("/api/settings", settingsRouter);
 
-app.use("/*", serveStatic({ root: staticRoot }));
+// Serve static assets from the client build
+app.use(
+  "/assets/*",
+  serveStatic({
+    root: staticRoot,
+    rewriteRequestPath: (p) => p,
+  }),
+);
+app.get("/robots.txt", serveStatic({ root: staticRoot, path: "/robots.txt" }));
 
-app.notFound((c) => c.json({ error: "Not found" }, 404));
+// SSR: delegate all other requests to TanStack Start's server handler
+app.all("/*", async (c) => {
+  try {
+    const serverPath = path.join(webDistPath, "server", "server.js");
+    const ssrModule = await import(serverPath);
+    const handler = ssrModule.default;
+    const response = await handler.fetch(c.req.raw);
+    return response;
+  } catch (err) {
+    console.error("SSR error:", err);
+    return c.json({ error: "Failed to render page" }, 500);
+  }
+});
 
 app.onError((err, c) => {
   console.error("Server error:", err);
