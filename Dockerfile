@@ -19,8 +19,8 @@ RUN npm ci
 
 COPY . .
 
-# Build web (TanStack Start)
-RUN npm run build --workspace=web
+# Build web (TanStack Start) — clear VITE_SERVER_URL so API calls use same origin
+RUN VITE_SERVER_URL="" npm run build --workspace=web
 
 # Build server
 RUN npm run build --workspace=server
