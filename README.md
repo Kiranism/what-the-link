@@ -27,7 +27,6 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
    ```
 
 2. **Set in `apps/server/.env`:**
-
    - `DATABASE_URL` — e.g. `file:./data/bookmarks.db` or a Turso URL
    - `APP_PASSWORD` — Password for the web UI and API
 
@@ -44,23 +43,14 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
    npm run dev
    ```
 
-   - Web: [http://localhost:3001](http://localhost:3001)  
-   - API: [http://localhost:3000](http://localhost:3000)  
+   - Web: [http://localhost:3001](http://localhost:3001)
+   - API: [http://localhost:3000](http://localhost:3000)
    - WhatsApp QR: [http://localhost:3000/api/whatsapp/qr](http://localhost:3000/api/whatsapp/qr)
 
 5. **First use**
-
    - Open the web app, enter `APP_PASSWORD`.
    - Go to **Setup**, scan the QR with WhatsApp (Linked devices).
    - Send a link in any WhatsApp chat; it should appear under **Bookmarks**.
-
-## Deploy to Render (one click)
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Kiranism/what-the-link)
-
-Click the button above, set `APP_PASSWORD` when prompted, and you're done. The `render.yaml` blueprint handles everything (Docker build, persistent disk for SQLite + WhatsApp auth).
-
-After deploy, visit `https://<your-app>.onrender.com/setup` to scan the WhatsApp QR code.
 
 ## Deploy to Fly.io
 
@@ -87,12 +77,10 @@ After deploy, visit `https://<your-app>.onrender.com/setup` to scan the WhatsApp
    ```
 
 5. **Connect WhatsApp**
-
    - Open `https://<your-app>.fly.dev/api/whatsapp/qr`
    - Scan with WhatsApp → Linked devices → Link a device.
 
 6. **Use the app**
-
    - Open `https://<your-app>.fly.dev`, enter your password, then use Bookmarks / Search / Setup / Settings.
 
 ### GitHub Actions
@@ -101,12 +89,12 @@ To deploy on push to `main`, add `FLY_API_TOKEN` to the repo secrets and use the
 
 ## Environment variables
 
-| Variable         | Required | Description                          |
-|-----------------|----------|--------------------------------------|
-| `DATABASE_URL`  | Yes      | SQLite/Turso URL or `file:...` path  |
-| `APP_PASSWORD`  | Yes      | Password for API and web UI          |
-| `WA_AUTH_DIR`   | No       | WhatsApp session dir (default: `./data/whatsapp_auth`) |
-| `CORS_ORIGIN`   | No       | CORS origin (default: `*`)          |
+| Variable       | Required | Description                                            |
+| -------------- | -------- | ------------------------------------------------------ |
+| `DATABASE_URL` | Yes      | SQLite/Turso URL or `file:...` path                    |
+| `APP_PASSWORD` | Yes      | Password for API and web UI                            |
+| `WA_AUTH_DIR`  | No       | WhatsApp session dir (default: `./data/whatsapp_auth`) |
+| `CORS_ORIGIN`  | No       | CORS origin (default: `*`)                             |
 
 ## API
 
