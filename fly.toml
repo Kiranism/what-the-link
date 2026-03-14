@@ -1,51 +1,55 @@
-# WhatsApp Bookmark Manager - Fly.io
-# See: https://fly.io/docs/reference/configuration/
+# fly.toml app configuration file generated for whatsapp-bookmarks on 2026-03-14T16:31:51+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "whatsapp-bookmarks"
+app = 'whatsapp-bookmarks'
+primary_region = 'bom'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  PORT = "3000"
-  NODE_ENV = "production"
-  WA_AUTH_DIR = "/data/whatsapp_auth"
-  DB_PATH = "/data/bookmarks.db"
+  DB_PATH = '/data/bookmarks.db'
+  NODE_ENV = 'production'
+  PORT = '3000'
+  WA_AUTH_DIR = '/data/whatsapp_auth'
 
-# For Turso: set DATABASE_URL via secrets
-# flyctl secrets set DATABASE_URL="libsql://..."
-# For file-based SQLite: use file:/data/bookmarks.db
-# flyctl secrets set DATABASE_URL="file:/data/bookmarks.db"
+[[mounts]]
+  source = 'whatsapp_data'
+  destination = '/data'
+  initial_size = '1gb'
 
 [[services]]
+  protocol = 'tcp'
   internal_port = 3000
-  protocol = "tcp"
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
   [[services.ports]]
     port = 80
-    handlers = ["http"]
+    handlers = ['http']
     force_https = true
 
   [[services.ports]]
     port = 443
-    handlers = ["tls", "http"]
+    handlers = ['tls', 'http']
 
   [services.concurrency]
-    type = "connections"
+    type = 'connections'
     hard_limit = 25
     soft_limit = 20
 
   [[services.http_checks]]
-    interval = 10000
-    timeout = 2000
-    grace_period = "10s"
-    method = "GET"
-    path = "/health"
+    interval = '10s'
+    timeout = '2s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/health'
 
-[mounts]
-  source = "whatsapp_data"
-  destination = "/data"
-  initial_size = "1gb"
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 1024
