@@ -1,4 +1,4 @@
-# WhatsApp Bookmark Manager
+# 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)_/¯
 
 Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fetches metadata, and provides a web UI for searching and organizing bookmarks.
 

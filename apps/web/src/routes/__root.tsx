@@ -26,7 +26,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "WhatsApp Bookmarks" },
+      { title: "𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\\_(ツ)_/¯" },
       { name: "theme-color", content: "#f5f0e8", media: "(prefers-color-scheme: light)" },
       { name: "theme-color", content: "#1c1c1c", media: "(prefers-color-scheme: dark)" },
     ],
