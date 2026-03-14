@@ -1,5 +1,5 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
-import { db } from "./db";
+import { db } from "@bookmark/db";
 import { and, eq, lt } from "drizzle-orm";
 import { fetchMetadata } from "./metadata";
 import { logger } from "../utils/logger";

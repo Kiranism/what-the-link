@@ -1,7 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useDeferredValue,
+} from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ColumnDef, PaginationState, RowSelectionState, SortingState } from "@tanstack/react-table";
+import { useQuery } from "@tanstack/react-query";
+import type {
+  ColumnDef,
+  PaginationState,
+  SortingState,
+} from "@tanstack/react-table";
 import {
   getCoreRowModel,
   getPaginationRowModel,
@@ -9,399 +20,107 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type { Bookmark } from "@bookmark/types";
-import {
-  ArchiveIcon,
-  CheckSquareIcon,
-  ChevronDownIcon,
-  ChevronUpIcon,
-  CircleIcon,
-  ExternalLinkIcon,
-  MailIcon,
-  StarIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { SearchIcon } from "lucide-react";
 
-import { Badge } from "@bookmark/ui/components/badge";
-import { Button } from "@bookmark/ui/components/button";
-import { DataGrid, DataGridContainer } from "../components/data-grid/data-grid";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@bookmark/ui/components/alert-dialog";
+import { DataGrid } from "../components/data-grid/data-grid";
 import { DataGridPagination } from "../components/data-grid/data-grid-pagination";
-import { DataGridTable } from "../components/data-grid/data-grid-table";
-import { ScrollArea, ScrollBar } from "@bookmark/ui/components/scroll-area";
-import { SearchBar } from "../components/SearchBar";
-import { TagFilter } from "../components/TagFilter";
-import { Checkbox } from "@bookmark/ui/components/checkbox";
-import { fetchBookmarks, updateBookmark, deleteBookmark, bulkUpdateBookmarks } from "../utils/api";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@bookmark/ui/components/input-group";
+import { Kbd, KbdGroup } from "@bookmark/ui/components/kbd";
+import { toast } from "sonner";
+import { fetchBookmarks } from "../utils/api";
 import { useLibraryShortcuts } from "../hooks/useKeyboardShortcuts";
+import {
+  useDeleteBookmarkMutation,
+  useMarkReadMutation,
+} from "../hooks/useBookmarkMutations";
+import { BookmarkRow } from "../components/BookmarkRow";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-const dateFormatter = new Intl.DateTimeFormat("en", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-});
-
 function HomePage() {
   const [search, setSearch] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [copiedBookmarkId, setCopiedBookmarkId] = useState<number | null>(null);
   const deferredSearch = useDeferredValue(search);
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 25,
   });
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-
-  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: [
       "bookmarks",
       deferredSearch,
-      selectedTags,
-      showFavoritesOnly,
-      showUnreadOnly,
       pagination.pageIndex,
       pagination.pageSize,
     ],
     queryFn: () =>
       fetchBookmarks({
         search: deferredSearch || undefined,
-        tags: selectedTags.length ? selectedTags : undefined,
-        favorite: showFavoritesOnly || undefined,
-        unread: showUnreadOnly || undefined,
         limit: pagination.pageSize,
         offset: pagination.pageIndex * pagination.pageSize,
       }),
   });
 
-  const favoriteMutation = useMutation({
-    mutationFn: ({ id, isFavorite }: { id: number; isFavorite: boolean }) =>
-      updateBookmark(id, { isFavorite }),
-    onMutate: async ({ id, isFavorite }) => {
-      await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
-      const prev = queryClient.getQueriesData({ queryKey: ["bookmarks"] });
-      queryClient.setQueriesData({ queryKey: ["bookmarks"] }, (old: any) => {
-        if (!old?.bookmarks) return old;
-        return { ...old, bookmarks: old.bookmarks.map((b: Bookmark) => b.id === id ? { ...b, isFavorite } : b) };
-      });
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.prev) {
-        for (const [key, data] of context.prev) {
-          queryClient.setQueryData(key, data);
-        }
-      }
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => deleteBookmark(id),
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
-      const prev = queryClient.getQueriesData({ queryKey: ["bookmarks"] });
-      queryClient.setQueriesData({ queryKey: ["bookmarks"] }, (old: any) => {
-        if (!old?.bookmarks) return old;
-        return { ...old, bookmarks: old.bookmarks.filter((b: Bookmark) => b.id !== id), total: old.total - 1 };
-      });
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.prev) {
-        for (const [key, data] of context.prev) {
-          queryClient.setQueryData(key, data);
-        }
-      }
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
-  });
-
-  const readMutation = useMutation({
-    mutationFn: (id: number) => updateBookmark(id, { isRead: true }),
-    onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ["bookmarks"] });
-      const prev = queryClient.getQueriesData({ queryKey: ["bookmarks"] });
-      queryClient.setQueriesData({ queryKey: ["bookmarks"] }, (old: any) => {
-        if (!old?.bookmarks) return old;
-        return { ...old, bookmarks: old.bookmarks.map((b: Bookmark) => b.id === id ? { ...b, isRead: true } : b) };
-      });
-      return { prev };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.prev) {
-        for (const [key, data] of context.prev) {
-          queryClient.setQueryData(key, data);
-        }
-      }
-    },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["bookmarks"] }),
-  });
-
-  const bulkMutation = useMutation({
-    mutationFn: ({ ids, action }: { ids: number[]; action: string }) =>
-      bulkUpdateBookmarks(ids, action as any),
-    onSuccess: () => {
-      setRowSelection({});
-      queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
-    },
-  });
-
-  const selectedIds = Object.keys(rowSelection)
-    .filter((k) => rowSelection[k])
-    .map(Number);
+  const deleteMutation = useDeleteBookmarkMutation();
+  const readMutation = useMarkReadMutation();
 
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [deleteTarget, setDeleteTarget] = useState<Bookmark | null>(null);
 
   const bookmarksList = data?.bookmarks ?? [];
-
-  const handleSelectRow = useCallback((id: number) => {
-    setRowSelection((prev) => {
-      const key = String(id);
-      return { ...prev, [key]: !prev[key] };
-    });
-  }, []);
-
-  const handleSelectAll = useCallback(() => {
-    const all: RowSelectionState = {};
-    for (const b of bookmarksList) {
-      all[String(b.id)] = true;
-    }
-    setRowSelection(all);
-  }, [bookmarksList]);
 
   useLibraryShortcuts({
     bookmarks: bookmarksList,
     focusedIndex,
     setFocusedIndex,
-    onFavorite: (id, isFavorite) => favoriteMutation.mutate({ id, isFavorite }),
-    onDelete: (id) => deleteMutation.mutate(id),
-    onRead: (id) => readMutation.mutate(id),
-    onSelect: handleSelectRow,
-    onSelectAll: handleSelectAll,
-    onArchiveSelected: () => {
-      if (selectedIds.length > 0) {
-        bulkMutation.mutate({ ids: selectedIds, action: "archive" });
-      }
+    onDelete: (id) => {
+      const b = bookmarksList.find((bm) => bm.id === id);
+      if (b) setDeleteTarget(b);
     },
-    onClearSelection: () => setRowSelection({}),
+    onRead: (id) => readMutation.mutate(id),
+    onSelect: () => {},
+    onSelectAll: () => {},
+    onArchiveSelected: () => {},
+    onClearSelection: () => {},
     onClearSearch: () => {
       setSearch("");
-      setSelectedTags([]);
-      setShowFavoritesOnly(false);
-      setShowUnreadOnly(false);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },
-    hasSelection: selectedIds.length > 0,
+    hasSelection: false,
   });
 
   const columns = useMemo<ColumnDef<Bookmark>[]>(
     () => [
       {
-        id: "select",
-        header: ({ table }) => (
-          <Checkbox
-            checked={table.getIsAllPageRowsSelected()}
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-            aria-label="Select all"
-            className="size-4"
-          />
-        ),
-        cell: ({ row }) => (
-          <Checkbox
-            checked={row.getIsSelected()}
-            onCheckedChange={(value) => row.toggleSelected(!!value)}
-            aria-label="Select row"
-            className="size-4"
-          />
-        ),
-        size: 36,
-        enableSorting: false,
-      },
-      {
-        id: "expand",
-        header: () => null,
-        cell: ({ row }) =>
-          row.getCanExpand() ? (
-            <Button
-              className="size-6 text-muted-foreground hover:bg-transparent"
-              onClick={row.getToggleExpandedHandler()}
-              variant="ghost"
-              size="icon-sm"
-            >
-              {row.getIsExpanded() ? (
-                <ChevronUpIcon aria-hidden="true" />
-              ) : (
-                <ChevronDownIcon aria-hidden="true" />
-              )}
-            </Button>
-          ) : null,
-        size: 36,
-        meta: {
-          expandedContent: (bookmark: Bookmark) =>
-            bookmark.description ? (
-              <p className="text-muted-foreground py-3 px-4 text-xs leading-6 whitespace-pre-wrap break-words">
-                {bookmark.description}
-              </p>
-            ) : null,
-        },
-      },
-      {
         accessorKey: "title",
         id: "title",
-        header: "Title",
-        cell: ({ row }) => {
-          const { title, url, favicon, isRead } = row.original;
-          return (
-            <div className="flex min-w-0 items-center gap-2.5">
-              {!isRead && (
-                <CircleIcon className="size-2 shrink-0 fill-primary text-primary" />
-              )}
-              {favicon ? (
-                <img
-                  src={favicon}
-                  alt=""
-                  className="size-4 shrink-0"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="size-4 shrink-0 rounded-sm border bg-muted" />
-              )}
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate font-medium text-foreground hover:text-primary hover:underline underline-offset-4"
-              >
-                {title || url}
-              </a>
-            </div>
-          );
-        },
-        size: 280,
         enableSorting: true,
-      },
-      {
-        accessorKey: "domain",
-        header: "Domain",
-        cell: ({ row }) => (
-          <span className="text-muted-foreground text-xs">
-            {row.original.domain}
-          </span>
-        ),
-        size: 140,
-      },
-      {
-        accessorKey: "tags",
-        header: "Tags",
-        cell: ({ row }) => {
-          const tags = Array.isArray(row.original.tags) ? row.original.tags : [];
-          if (!tags.length)
-            return (
-              <span className="text-muted-foreground/50 text-xs">—</span>
-            );
-          return (
-            <div className="flex flex-wrap gap-1">
-              {tags.slice(0, 3).map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
-              {tags.length > 3 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{tags.length - 3}
-                </Badge>
-              )}
-            </div>
-          );
-        },
-        size: 180,
-        enableSorting: false,
-      },
-      {
-        accessorKey: "source",
-        header: "Source",
-        cell: ({ row }) => (
-          <Badge variant="secondary" className="text-xs capitalize">
-            {row.original.source}
-          </Badge>
-        ),
-        size: 90,
       },
       {
         accessorKey: "createdAt",
-        header: "Saved",
-        cell: ({ row }) => (
-          <span className="text-muted-foreground text-xs">
-            {dateFormatter.format(new Date(String(row.original.createdAt)))}
-          </span>
-        ),
-        size: 110,
         enableSorting: true,
       },
-      {
-        id: "actions",
-        header: () => null,
-        cell: ({ row }) => {
-          const bookmark = row.original;
-          return (
-            <div className="flex items-center gap-1">
-              <Button
-                variant={bookmark.isFavorite ? "default" : "outline"}
-                size="icon-sm"
-                className="size-7"
-                title={bookmark.isFavorite ? "Unfavorite" : "Favorite"}
-                disabled={favoriteMutation.isPending}
-                onClick={() =>
-                  favoriteMutation.mutate({
-                    id: bookmark.id,
-                    isFavorite: !bookmark.isFavorite,
-                  })
-                }
-              >
-                <StarIcon className="size-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                className="size-7"
-                title="Open link"
-                onClick={() => {
-                  window.open(bookmark.url, "_blank", "noopener,noreferrer");
-                  if (!bookmark.isRead) {
-                    readMutation.mutate(bookmark.id);
-                  }
-                }}
-              >
-                <ExternalLinkIcon className="size-3.5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                className="size-7 text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                title="Delete bookmark"
-                disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (confirm("Delete this bookmark?")) {
-                    deleteMutation.mutate(bookmark.id);
-                  }
-                }}
-              >
-                <Trash2Icon className="size-3.5" />
-              </Button>
-            </div>
-          );
-        },
-        size: 110,
-      },
     ],
-    [favoriteMutation, deleteMutation, readMutation],
+    [],
   );
 
   const total = data?.total ?? 0;
@@ -413,11 +132,9 @@ function HomePage() {
     getRowId: (row) => String(row.id),
     getRowCanExpand: (row) => Boolean(row.original.description),
     manualPagination: true,
-    enableRowSelection: true,
-    state: { pagination, sorting, rowSelection },
+    state: { pagination, sorting },
     onPaginationChange: setPagination,
     onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -425,143 +142,252 @@ function HomePage() {
 
   const tableRef = useRef<HTMLDivElement>(null);
 
+  // Collapse all expanded rows and scroll focused row into view when focus changes
   useEffect(() => {
+    table.toggleAllRowsExpanded(false);
     if (!tableRef.current || focusedIndex < 0) return;
-    const rows = tableRef.current.querySelectorAll("tbody tr");
-    rows.forEach((row, i) => {
-      if (i === focusedIndex) {
-        row.classList.add("ring-2", "ring-primary/50", "ring-inset");
-        row.scrollIntoView({ block: "nearest" });
-      } else {
-        row.classList.remove("ring-2", "ring-primary/50", "ring-inset");
+    const row = tableRef.current.querySelector(
+      `#bookmark-row-${bookmarksList[focusedIndex]?.id}`,
+    );
+    row?.scrollIntoView({ block: "nearest" });
+  }, [focusedIndex, bookmarksList]);
+
+  const activeDescendantId =
+    focusedIndex >= 0 && bookmarksList[focusedIndex]
+      ? `bookmark-row-${bookmarksList[focusedIndex].id}`
+      : undefined;
+
+  // Global keyboard handler — works without requiring focus on the list
+  useEffect(() => {
+    function isInputFocused() {
+      const el = document.activeElement;
+      return (
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement ||
+        (el as HTMLElement)?.isContentEditable
+      );
+    }
+
+    function handleKeyDown(e: KeyboardEvent) {
+      if (isInputFocused()) return;
+      // Don't intercept keys when a dialog/modal is open
+      if (document.querySelector("[data-slot=alert-dialog-content]")) return;
+
+      const key = e.key;
+
+      // "/" → focus search
+      if (key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        const input = document.querySelector<HTMLInputElement>(
+          'input[aria-label="Search bookmarks"]',
+        );
+        input?.focus();
+        input?.select();
+        return;
       }
-    });
-    return () => {
-      rows.forEach((row) => {
-        row.classList.remove("ring-2", "ring-primary/50", "ring-inset");
-      });
-    };
-  }, [focusedIndex]);
+
+      if (bookmarksList.length === 0) return;
+
+      // Arrow navigation
+      if (key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIndex((prev) => Math.min(prev + 1, bookmarksList.length - 1));
+      } else if (key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIndex((prev) => Math.max(prev - 1, 0));
+      } else if (key === "Home") {
+        e.preventDefault();
+        setFocusedIndex(0);
+      } else if (key === "End") {
+        e.preventDefault();
+        setFocusedIndex(bookmarksList.length - 1);
+      } else if (key === "Enter" && focusedIndex >= 0) {
+        e.preventDefault();
+        const b = bookmarksList[focusedIndex];
+        if (!b) return;
+        if (e.metaKey || e.ctrlKey) {
+          window.open(b.url, "_blank", "noopener,noreferrer");
+          if (!b.isRead) readMutation.mutate(b.id);
+        } else {
+          navigator.clipboard.writeText(b.url);
+          toast.success("Link copied to clipboard");
+          setCopiedBookmarkId(b.id);
+          setTimeout(() => setCopiedBookmarkId(null), 1000);
+        }
+      } else if (key === " " && focusedIndex >= 0) {
+        e.preventDefault();
+        const rows = table.getRowModel().rows;
+        if (rows[focusedIndex]) {
+          rows[focusedIndex].toggleExpanded();
+        }
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [bookmarksList, focusedIndex, readMutation, setFocusedIndex, table]);
 
   function handleSearchChange(value: string) {
     setSearch(value);
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }
 
-  function handleTagsChange(tags: string[]) {
-    setSelectedTags(tags);
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }
+  const handleOpenLink = useCallback(
+    (bookmark: Bookmark) => {
+      window.open(bookmark.url, "_blank", "noopener,noreferrer");
+      if (!bookmark.isRead) readMutation.mutate(bookmark.id);
+    },
+    [readMutation],
+  );
 
-  function handleFavoritesToggle() {
-    setShowFavoritesOnly((c) => !c);
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
-  }
+  const handleDelete = useCallback(
+    (bookmark: Bookmark) => setDeleteTarget(bookmark),
+    [],
+  );
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-60">
-          <SearchBar value={search} onChange={handleSearchChange} />
-        </div>
-        <Button
-          variant={showUnreadOnly ? "default" : "outline"}
-          size="sm"
-          onClick={() => {
-            setShowUnreadOnly((c) => !c);
-            setPagination((p) => ({ ...p, pageIndex: 0 }));
+    <div className="flex flex-col gap-3 sm:gap-4">
+      {/* Search */}
+      <InputGroup className="w-full border-border/40 bg-muted/30 transition-[border-color,background-color] duration-150 focus-within:border-border focus-within:bg-background focus-within:ring-0 h-11 sm:h-14">
+        <InputGroupAddon>
+          <SearchIcon className="size-4 sm:size-5 text-muted-foreground" />
+        </InputGroupAddon>
+        <InputGroupInput
+          aria-label="Search bookmarks"
+          placeholder="Search bookmarks…"
+          type="search"
+          value={search}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              (e.target as HTMLElement)?.blur();
+            } else if (e.key === "ArrowDown" && bookmarksList.length > 0) {
+              e.preventDefault();
+              setFocusedIndex(0);
+            }
           }}
-        >
-          <MailIcon data-icon="inline-start" />
-          {showUnreadOnly ? "Showing unread" : "Unread only"}
-        </Button>
-        <Button
-          variant={showFavoritesOnly ? "default" : "outline"}
-          size="sm"
-          onClick={handleFavoritesToggle}
-        >
-          <StarIcon data-icon="inline-start" />
-          {showFavoritesOnly ? "Showing favorites" : "Favorites only"}
-        </Button>
-        <div className="text-muted-foreground text-sm">
-          {isLoading ? "Loading…" : `${total} bookmark${total !== 1 ? "s" : ""}`}
-        </div>
+          className="text-sm sm:text-base h-11 sm:h-14"
+        />
+        <InputGroupAddon align="inline-end">
+          <Kbd className="hidden sm:inline-flex text-base h-8 px-3">
+            {searchFocused ? "Esc" : "/"}
+          </Kbd>
+        </InputGroupAddon>
+      </InputGroup>
+
+      {/* Keyboard shortcuts hint — hidden on mobile (touch devices don't use keyboard) */}
+      <div
+        className="hidden sm:flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground/70"
+        aria-hidden="true"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <KbdGroup>
+            <Kbd>↑</Kbd>
+            <Kbd>↓</Kbd>
+          </KbdGroup>{" "}
+          navigate
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>⏎</Kbd> copy
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
+          <KbdGroup>
+            <Kbd>⌘</Kbd>
+            <Kbd>⏎</Kbd>
+          </KbdGroup>{" "}
+          open
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>Space</Kbd> expand
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
+          <Kbd>D</Kbd> delete
+        </span>
       </div>
-
-      {/* Tag filter */}
-      <TagFilter selected={selectedTags} onChange={handleTagsChange} />
-
-      {/* Bulk actions */}
-      {selectedIds.length > 0 && (
-        <div className="flex items-center gap-2 rounded-md border border-border bg-card px-4 py-2">
-          <span className="text-sm font-medium">{selectedIds.length} selected</span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => bulkMutation.mutate({ ids: selectedIds, action: "archive" })}
-              disabled={bulkMutation.isPending}
-            >
-              <ArchiveIcon data-icon="inline-start" />
-              Archive
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => bulkMutation.mutate({ ids: selectedIds, action: "favorite" })}
-              disabled={bulkMutation.isPending}
-            >
-              <StarIcon data-icon="inline-start" />
-              Favorite
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => bulkMutation.mutate({ ids: selectedIds, action: "markRead" })}
-              disabled={bulkMutation.isPending}
-            >
-              <CheckSquareIcon data-icon="inline-start" />
-              Mark read
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                if (confirm(`Delete ${selectedIds.length} bookmark(s)?`)) {
-                  bulkMutation.mutate({ ids: selectedIds, action: "delete" });
-                }
-              }}
-              disabled={bulkMutation.isPending}
-            >
-              <Trash2Icon data-icon="inline-start" />
-              Delete
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Table */}
       <div ref={tableRef}>
-      <DataGrid
-        table={table}
-        recordCount={total}
-        isLoading={isLoading}
-        loadingMode="skeleton"
-        emptyMessage="No bookmarks found. Try adjusting your filters."
-        tableLayout={{ headerBackground: false, rowBorder: true }}
-      >
-        <div className="space-y-2">
-          <DataGridContainer border={false}>
-            <ScrollArea>
-              <DataGridTable />
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
-          </DataGridContainer>
-          <DataGridPagination sizes={[10, 25, 50]} />
-        </div>
-      </DataGrid>
+        <DataGrid
+          table={table}
+          recordCount={total}
+          isLoading={isLoading}
+          loadingMode="skeleton"
+          emptyMessage="No bookmarks yet — press / to search or add your first bookmark"
+          tableLayout={{ headerBackground: false, rowBorder: true }}
+        >
+          <div className="space-y-4">
+            <div
+              role="listbox"
+              aria-label="Bookmarks"
+              aria-activedescendant={activeDescendantId}
+              className="flex flex-col gap-1.5 sm:gap-2"
+            >
+              {table.getRowModel().rows.map((row, index) => (
+                <BookmarkRow
+                  key={row.id}
+                  bookmark={row.original}
+                  isFocused={index === focusedIndex}
+                  isCopied={copiedBookmarkId === row.original.id}
+                  isExpanded={row.getIsExpanded()}
+                  onToggleExpanded={row.getToggleExpandedHandler()}
+                  onOpenLink={handleOpenLink}
+                  onDelete={handleDelete}
+                  isPendingDelete={deleteMutation.isPending}
+                />
+              ))}
+            </div>
+            {total > 10 && (
+              <DataGridPagination
+                sizes={[10, 25, 50]}
+                className="px-2 py-0 min-h-0"
+              />
+            )}
+          </div>
+        </DataGrid>
       </div>
+
+      {/* Delete confirmation */}
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete bookmark</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              {deleteTarget?.title
+                ? `\u201c${deleteTarget.title}\u201d`
+                : "this bookmark"}
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleteTarget) {
+                  deleteMutation.mutate(deleteTarget.id);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

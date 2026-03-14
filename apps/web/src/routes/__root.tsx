@@ -8,6 +8,7 @@ import {
   createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
+import { ThemeProvider } from "better-themes";
 
 import { AuthGuard } from "../components/AuthGuard";
 import Header from "../components/header";
@@ -26,6 +27,8 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "WhatsApp Bookmarks" },
+      { name: "theme-color", content: "#f5f0e8", media: "(prefers-color-scheme: light)" },
+      { name: "theme-color", content: "#1c1c1c", media: "(prefers-color-scheme: dark)" },
     ],
     links: [{ rel: "stylesheet", href: appCss }],
   }),
@@ -43,31 +46,25 @@ function GlobalShortcuts() {
 
 function RootDocument() {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body className="min-h-svh bg-background text-foreground">
-        <div className="relative min-h-svh overflow-x-hidden">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-[32rem] bg-[radial-gradient(circle_at_top_left,rgba(94,234,212,0.18),transparent_35%),radial-gradient(circle_at_top_right,rgba(59,130,246,0.12),transparent_30%),linear-gradient(to_bottom,rgba(255,255,255,0.72),transparent)]"
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 bottom-0 h-80 bg-[radial-gradient(circle_at_bottom,rgba(251,191,36,0.12),transparent_40%)]"
-          />
-          <div className="relative grid min-h-svh grid-rows-[auto_1fr]">
-            <Header />
-            <main className="mx-auto flex w-full max-w-7xl flex-col px-4 py-8 sm:px-6 lg:px-8">
-              <AuthGuard>
-                <GlobalShortcuts />
-                <Outlet />
-              </AuthGuard>
-            </main>
+        <ThemeProvider attribute="class" disableTransitionOnChange>
+          <div className="relative min-h-svh overflow-x-hidden">
+            <div className="relative grid min-h-svh grid-rows-[auto_1fr]">
+              <Header />
+              <main className="mx-auto flex w-full max-w-5xl flex-col px-2 py-4 sm:px-6 sm:py-6 lg:px-8">
+                <AuthGuard>
+                  <GlobalShortcuts />
+                  <Outlet />
+                </AuthGuard>
+              </main>
+            </div>
           </div>
-        </div>
-        <Toaster richColors />
+          <Toaster />
+        </ThemeProvider>
         <TanStackRouterDevtools position="bottom-left" />
         <ReactQueryDevtools position="bottom" buttonPosition="bottom-right" />
         <Scripts />

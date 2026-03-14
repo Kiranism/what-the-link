@@ -49,8 +49,8 @@ export function QRDisplay({
       <Card className="border-dashed border-border/80 bg-card/70">
         <CardContent className="flex min-h-56 items-center justify-center py-8 text-center">
           <div className="flex max-w-sm flex-col items-center gap-3 text-muted-foreground">
-            <AlertCircleIcon />
-            <p className="text-sm">{message ?? "Loading QR code..."}</p>
+            <AlertCircleIcon aria-hidden="true" />
+            <p className="text-sm">{message ?? "Loading QR code\u2026"}</p>
           </div>
         </CardContent>
       </Card>
@@ -71,8 +71,8 @@ export function QRDisplay({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex justify-center">
-        <div className="border bg-white p-4 shadow-sm">
-          <img src={qr} alt="WhatsApp QR code" className="w-full max-w-64" />
+        <div className="aspect-square border bg-white p-3 shadow-sm">
+          <img src={qr} alt="WhatsApp QR code" width={256} height={256} className="size-full object-contain" />
         </div>
       </CardContent>
     </Card>

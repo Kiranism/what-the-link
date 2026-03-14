@@ -9,6 +9,7 @@ import { settingsRouter } from "./routes/settings";
 import { whatsappRouter } from "./routes/whatsapp";
 import { authMiddleware } from "./middleware/auth";
 import { env } from "@bookmark/env/server";
+import { logger } from "./utils/logger";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const webDistPath = path.join(__dirname, "../../web/dist");
@@ -57,13 +58,13 @@ app.all("/*", async (c) => {
     const response = await handler.fetch(c.req.raw);
     return response;
   } catch (err) {
-    console.error("SSR error:", err);
+    logger.error("SSR error", { error: err instanceof Error ? err.message : String(err) });
     return c.json({ error: "Failed to render page" }, 500);
   }
 });
 
 app.onError((err, c) => {
-  console.error("Server error:", err);
+  logger.error("Server error", { error: err.message });
   return c.json(
     { error: err.message ?? "Internal server error" },
     500,

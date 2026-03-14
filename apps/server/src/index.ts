@@ -15,10 +15,9 @@ async function ensureNewColumns(): Promise<void> {
     try {
       await dbClient.execute(col.sql);
       logger.info(`Added column: ${col.name}`);
-    } catch (e: any) {
-      // Column already exists — ignore
-      if (e?.message?.includes("duplicate column")) continue;
-      if (e?.message?.includes("already exists")) continue;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("duplicate column") || msg.includes("already exists")) continue;
       throw e;
     }
   }
@@ -63,9 +62,9 @@ async function main() {
   try {
     await runMigrations();
     logger.info("Database migrations complete");
-  } catch (e: any) {
-    // If migrations fail because tables already exist (pre-migration DB), that's OK
-    if (e?.message?.includes("already exists")) {
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("already exists")) {
       logger.warn("Migration skipped (tables already exist), applying column updates...");
     } else {
       throw e;

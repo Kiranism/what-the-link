@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 const KEY_WA_ALLOWED_GROUP_JID = "wa_allowed_group_jid";
 
-let cache: { waAllowedGroupJid: string | null } = { waAllowedGroupJid: undefined as unknown as string | null };
+let cache: { waAllowedGroupJid: string | null } = { waAllowedGroupJid: null };
 
 export async function ensureAppSettingsTable(): Promise<void> {
   await dbClient.execute(

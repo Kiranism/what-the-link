@@ -120,51 +120,49 @@ function DataGridProvider<TData extends object>({
   );
 }
 
+const DEFAULT_TABLE_LAYOUT = {
+  dense: false,
+  cellBorder: false,
+  rowBorder: true,
+  rowRounded: false,
+  stripped: false,
+  headerSticky: false,
+  headerBackground: true,
+  headerBorder: true,
+  width: "fixed" as const,
+  columnsVisibility: false,
+  columnsResizable: false,
+  columnsPinnable: false,
+  columnsMovable: false,
+  columnsDraggable: false,
+  rowsDraggable: false,
+};
+
+const DEFAULT_TABLE_CLASS_NAMES = {
+  base: "",
+  header: "",
+  headerRow: "",
+  headerSticky: "sticky top-0 z-10 bg-background/90 backdrop-blur-xs",
+  body: "",
+  bodyRow: "",
+  footer: "",
+  edgeCell: "",
+};
+
 function DataGrid<TData extends object>({
   children,
   table,
   ...props
 }: DataGridProps<TData>) {
-  const defaultProps: Partial<DataGridProps<TData>> = {
-    loadingMode: "skeleton",
-    tableLayout: {
-      dense: false,
-      cellBorder: false,
-      rowBorder: true,
-      rowRounded: false,
-      stripped: false,
-      headerSticky: false,
-      headerBackground: true,
-      headerBorder: true,
-      width: "fixed",
-      columnsVisibility: false,
-      columnsResizable: false,
-      columnsPinnable: false,
-      columnsMovable: false,
-      columnsDraggable: false,
-      rowsDraggable: false,
-    },
-    tableClassNames: {
-      base: "",
-      header: "",
-      headerRow: "",
-      headerSticky: "sticky top-0 z-10 bg-background/90 backdrop-blur-xs",
-      body: "",
-      bodyRow: "",
-      footer: "",
-      edgeCell: "",
-    },
-  };
-
   const mergedProps: DataGridProps<TData> = {
-    ...defaultProps,
+    loadingMode: "skeleton",
     ...props,
     tableLayout: {
-      ...defaultProps.tableLayout,
+      ...DEFAULT_TABLE_LAYOUT,
       ...(props.tableLayout || {}),
     },
     tableClassNames: {
-      ...defaultProps.tableClassNames,
+      ...DEFAULT_TABLE_CLASS_NAMES,
       ...(props.tableClassNames || {}),
     },
   };

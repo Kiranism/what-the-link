@@ -1,10 +1,29 @@
 import { useHotkey } from "@tanstack/react-hotkeys";
 import { useNavigate } from "@tanstack/react-router";
+import { useTheme } from "better-themes";
 import { useCallback, useEffect, useState } from "react";
+
+/** Check if an input-like element is focused (shared utility). */
+export function isInputFocused(): boolean {
+  const el = document.activeElement;
+  return (
+    el instanceof HTMLInputElement ||
+    el instanceof HTMLTextAreaElement ||
+    el instanceof HTMLSelectElement ||
+    (el as HTMLElement)?.isContentEditable
+  );
+}
 
 export function useGlobalShortcuts() {
   const navigate = useNavigate();
+  const { theme, setTheme } = useTheme();
   const [showHelp, setShowHelp] = useState(false);
+
+  // T → toggle theme
+  useHotkey("T", () => {
+    if (isInputFocused()) return;
+    setTheme(theme === "dark" ? "light" : "dark");
+  });
 
   // Cmd+K / Ctrl+K → focus search input
   useHotkey("Mod+K", (e) => {
@@ -32,7 +51,9 @@ export function useGlobalShortcuts() {
     function handleKeyDown(e: KeyboardEvent) {
       if (
         e.key === "?" &&
-        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.altKey &&
         !(e.target instanceof HTMLInputElement) &&
         !(e.target instanceof HTMLTextAreaElement)
       ) {
@@ -61,30 +82,14 @@ export function useNavigationShortcuts() {
 
   useHotkey("Alt+2", (e) => {
     e.preventDefault();
-    navigate({ to: "/swipe" });
-  });
-
-  useHotkey("Alt+3", (e) => {
-    e.preventDefault();
-    navigate({ to: "/search" });
-  });
-
-  useHotkey("Alt+4", (e) => {
-    e.preventDefault();
-    navigate({ to: "/setup" });
-  });
-
-  useHotkey("Alt+5", (e) => {
-    e.preventDefault();
     navigate({ to: "/settings" });
   });
 }
 
 interface UseLibraryShortcutsOptions {
-  bookmarks: Array<{ id: number; url: string; isFavorite: boolean; isRead: boolean }>;
+  bookmarks: Array<{ id: number; url: string; isRead: boolean }>;
   focusedIndex: number;
   setFocusedIndex: (index: number | ((prev: number) => number)) => void;
-  onFavorite: (id: number, isFavorite: boolean) => void;
   onDelete: (id: number) => void;
   onRead: (id: number) => void;
   onSelect: (id: number) => void;
@@ -100,7 +105,6 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
     bookmarks,
     focusedIndex,
     setFocusedIndex,
-    onFavorite,
     onDelete,
     onRead,
     onSelect,
@@ -110,16 +114,6 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
     onClearSearch,
     hasSelection,
   } = opts;
-
-  const isInputFocused = useCallback(() => {
-    const el = document.activeElement;
-    return (
-      el instanceof HTMLInputElement ||
-      el instanceof HTMLTextAreaElement ||
-      el instanceof HTMLSelectElement ||
-      (el as HTMLElement)?.isContentEditable
-    );
-  }, []);
 
   const getFocusedBookmark = useCallback(() => {
     if (focusedIndex >= 0 && focusedIndex < bookmarks.length) {
@@ -140,24 +134,8 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
     setFocusedIndex((prev: number) => Math.max(prev - 1, 0));
   });
 
-  // F → toggle favorite
-  useHotkey("F", () => {
-    if (isInputFocused()) return;
-    const b = getFocusedBookmark();
-    if (b) onFavorite(b.id, !b.isFavorite);
-  });
-
-  // O or Enter → open link
+  // O → open link in new tab
   useHotkey("O", () => {
-    if (isInputFocused()) return;
-    const b = getFocusedBookmark();
-    if (b) {
-      window.open(b.url, "_blank", "noopener,noreferrer");
-      if (!b.isRead) onRead(b.id);
-    }
-  });
-
-  useHotkey("Enter", () => {
     if (isInputFocused()) return;
     const b = getFocusedBookmark();
     if (b) {
@@ -200,9 +178,7 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
   useHotkey("D", () => {
     if (isInputFocused()) return;
     const b = getFocusedBookmark();
-    if (b && confirm("Delete this bookmark?")) {
-      onDelete(b.id);
-    }
+    if (b) onDelete(b.id);
   });
 }
 
@@ -210,17 +186,21 @@ export const SHORTCUT_GROUPS = [
   {
     title: "Global",
     shortcuts: [
+      { keys: "/", description: "Focus search" },
       { keys: "Cmd+K", description: "Focus search" },
-      { keys: "Alt+1-5", description: "Navigate to page" },
+      { keys: "Alt+1-2", description: "Navigate to page" },
+      { keys: "T", description: "Toggle theme" },
       { keys: "?", description: "Toggle shortcuts help" },
     ],
   },
   {
     title: "Library",
     shortcuts: [
-      { keys: "J / K", description: "Navigate up / down" },
-      { keys: "Enter / O", description: "Open focused link" },
-      { keys: "F", description: "Toggle favorite" },
+      { keys: "J / K / \u2191 / \u2193", description: "Navigate up / down" },
+      { keys: "⏎", description: "Copy link" },
+      { keys: "Cmd+⏎", description: "Open in new tab" },
+      { keys: "Space", description: "Expand / collapse" },
+      { keys: "O", description: "Open in new tab" },
       { keys: "X", description: "Select / deselect row" },
       { keys: "Cmd+A", description: "Select all" },
       { keys: "A", description: "Archive selected" },

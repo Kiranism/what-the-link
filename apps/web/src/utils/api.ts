@@ -3,11 +3,19 @@ import type { CreateBookmarkBody, UpdateBookmarkBody } from "@bookmark/types/api
 
 const API_BASE = (import.meta.env.VITE_SERVER_URL ?? "") + "/api";
 
+let cachedPassword: string | null = null;
+
+/** Update the cached auth token. Called from useAuth when password changes. */
+export function setAuthToken(token: string | null) {
+  cachedPassword = token;
+}
+
 function getAuthHeaders(): HeadersInit {
-  const password = localStorage.getItem("app_password");
+  const password = cachedPassword ?? (typeof window !== "undefined" ? localStorage.getItem("app_password") : null);
   if (!password) {
     throw new Error("Not authenticated");
   }
+  if (!cachedPassword) cachedPassword = password;
   return {
     Authorization: `Bearer ${password}`,
     "Content-Type": "application/json",

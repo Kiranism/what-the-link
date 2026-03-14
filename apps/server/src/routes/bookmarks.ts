@@ -1,7 +1,8 @@
 import type { NewBookmark } from "@bookmark/db/schema/bookmarks";
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
-import { db, dbClient } from "../services/db";
+import { db, dbClient } from "@bookmark/db";
 import { fetchMetadata } from "../services/metadata";
+import { normalizeUrl } from "../utils/url-extractor";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 
@@ -151,10 +152,7 @@ bookmarksRouter.post("/import", async (c) => {
       continue;
     }
 
-    let url = item.url.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = `https://${url}`;
-    }
+    const url = normalizeUrl(item.url);
 
     const [existing] = await db
       .select({ id: bookmarks.id })
@@ -253,10 +251,7 @@ bookmarksRouter.post("/", async (c) => {
     return c.json({ error: "URL is required" }, 400);
   }
 
-  let url = body.url.trim();
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = `https://${url}`;
-  }
+  const url = normalizeUrl(body.url);
 
   const [existing] = await db
     .select()
