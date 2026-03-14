@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: whatsapp-bookmarks
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    region: singapore
+    healthCheckPath: /health
+    disk:
+      name: whatsapp-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: DATABASE_URL
+        value: "file:/app/data/bookmarks.db"
+      - key: WA_AUTH_DIR
+        value: /app/data/whatsapp_auth
+      - key: APP_PASSWORD
+        sync: false

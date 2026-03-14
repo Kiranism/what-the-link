@@ -1,102 +1,151 @@
-# bookmark
+# WhatsApp Bookmark Manager
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Start, Hono, ORPC, and more.
+Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fetches metadata, and provides a web UI for searching and organizing bookmarks.
 
 ## Features
 
-- **TypeScript** - For type safety and improved developer experience
-- **TanStack Start** - SSR framework with TanStack Router
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Hono** - Lightweight, performant server framework
-- **oRPC** - End-to-end type-safe APIs with OpenAPI integration
-- **Node.js** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **SQLite/Turso** - Database engine
+- **WhatsApp integration** — Send a link in any chat; it’s saved automatically (via Baileys)
+- **Metadata** — Title, description, and image from Open Graph
+- **Web UI** — Search, filter by tags/domain, favorites, tag editing
+- **Single user** — Password-protected; no OAuth
+- **Free-tier friendly** — Designed for Fly.io (or similar) with SQLite/Turso
 
-## Getting Started
+## Tech Stack
 
-First, install the dependencies:
+- **Frontend:** TanStack Start (React), Tailwind, shadcn-style UI
+- **Backend:** Hono
+- **Database:** SQLite (Turso / libsql), Drizzle ORM
+- **WhatsApp:** Baileys (unofficial Web API)
 
-```bash
-npm install
-```
+## Quick Start (local)
 
-## Database Setup
+1. **Install and env**
 
-This project uses SQLite with Drizzle ORM.
+   ```bash
+   npm install
+   cp .env.example apps/server/.env
+   ```
 
-1. Start the local SQLite database (optional):
+2. **Set in `apps/server/.env`:**
 
-```bash
-npm run db:local
-```
+   - `DATABASE_URL` — e.g. `file:./data/bookmarks.db` or a Turso URL
+   - `APP_PASSWORD` — Password for the web UI and API
 
-2. Update your `.env` file in the `apps/server` directory with the appropriate connection details if needed.
+3. **Database**
 
-3. Apply the schema to your database:
+   ```bash
+   npm run db:push
+   # or: npm run db:generate && npm run db:migrate
+   ```
 
-```bash
-npm run db:push
-```
+4. **Run**
 
-Then, run the development server:
+   ```bash
+   npm run dev
+   ```
 
-```bash
-npm run dev
-```
+   - Web: [http://localhost:3001](http://localhost:3001)  
+   - API: [http://localhost:3000](http://localhost:3000)  
+   - WhatsApp QR: [http://localhost:3000/api/whatsapp/qr](http://localhost:3000/api/whatsapp/qr)
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+5. **First use**
 
-## UI Customization
+   - Open the web app, enter `APP_PASSWORD`.
+   - Go to **Setup**, scan the QR with WhatsApp (Linked devices).
+   - Send a link in any WhatsApp chat; it should appear under **Bookmarks**.
 
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
+## Deploy to Render (one click)
 
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-### Add more shared components
+Click the button above, set `APP_PASSWORD` when prompted, and you're done. The `render.yaml` blueprint handles everything (Docker build, persistent disk for SQLite + WhatsApp auth).
 
-Run this from the project root to add more primitives to the shared UI package:
+After deploy, visit `https://<your-app>.onrender.com/setup` to scan the WhatsApp QR code.
 
-```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
-```
+## Deploy to Fly.io
 
-Import shared components like this:
+1. **Fork/clone** and install [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/).
 
-```tsx
-import { Button } from "@bookmark/ui/components/button";
-```
+2. **Create app and volume**
 
-### Add app-specific blocks
+   ```bash
+   flyctl launch
+   flyctl volumes create whatsapp_data --size 1 --region sin
+   ```
 
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
+3. **Secrets**
 
-## Project Structure
+   ```bash
+   flyctl secrets set APP_PASSWORD="your-secure-password"
+   flyctl secrets set DATABASE_URL="file:/data/bookmarks.db"
+   ```
+
+4. **Deploy**
+
+   ```bash
+   flyctl deploy
+   ```
+
+5. **Connect WhatsApp**
+
+   - Open `https://<your-app>.fly.dev/api/whatsapp/qr`
+   - Scan with WhatsApp → Linked devices → Link a device.
+
+6. **Use the app**
+
+   - Open `https://<your-app>.fly.dev`, enter your password, then use Bookmarks / Search / Setup / Settings.
+
+### GitHub Actions
+
+To deploy on push to `main`, add `FLY_API_TOKEN` to the repo secrets and use the workflow in `.github/workflows/deploy.yml`.
+
+## Environment variables
+
+| Variable         | Required | Description                          |
+|-----------------|----------|--------------------------------------|
+| `DATABASE_URL`  | Yes      | SQLite/Turso URL or `file:...` path  |
+| `APP_PASSWORD`  | Yes      | Password for API and web UI          |
+| `WA_AUTH_DIR`   | No       | WhatsApp session dir (default: `./data/whatsapp_auth`) |
+| `CORS_ORIGIN`   | No       | CORS origin (default: `*`)          |
+
+## API
+
+- `GET /health` — Health check (no auth).
+- `GET /api/whatsapp/qr` — Current QR payload (no auth).
+- `GET /api/whatsapp/status` — Connection status.
+- `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `favorite`, `archived`, `limit`, `offset`). Auth: `Authorization: Bearer <APP_PASSWORD>`.
+- `GET /api/bookmarks/:id` — One bookmark.
+- `POST /api/bookmarks` — Create (body: `url`, optional `title`, `tags`, etc.).
+- `PATCH /api/bookmarks/:id` — Update.
+- `DELETE /api/bookmarks/:id` — Delete.
+
+## Project structure
 
 ```
 bookmark/
 ├── apps/
-│   ├── web/         # Frontend application (React + TanStack Start)
-│   └── server/      # Backend API (Hono, ORPC)
+│   ├── web/           # TanStack Start frontend
+│   └── server/       # Hono API + WhatsApp (Baileys)
 ├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   └── db/          # Database schema & queries
+│   ├── db/            # Drizzle schema + migrations
+│   ├── env/            # Env validation
+│   ├── types/         # Shared types
+│   └── ui/            # Shared UI components
+├── Dockerfile
+├── fly.toml
+└── .env.example
 ```
 
-## Available Scripts
+## Scripts
 
-- `npm run dev`: Start all applications in development mode
-- `npm run build`: Build all applications
-- `npm run dev:web`: Start only the web application
-- `npm run dev:server`: Start only the server
-- `npm run check-types`: Check TypeScript types across all apps
-- `npm run db:push`: Push schema changes to database
-- `npm run db:generate`: Generate database client/types
-- `npm run db:migrate`: Run database migrations
-- `npm run db:studio`: Open database studio UI
-- `npm run db:local`: Start the local SQLite database
+- `npm run dev` — Run web + server
+- `npm run dev:web` / `npm run dev:server` — Run one app
+- `npm run build` — Build all
+- `npm run db:push` — Push schema
+- `npm run db:generate` — Generate migrations
+- `npm run db:migrate` — Run migrations
+- `npm run db:studio` — Drizzle Studio
+
+## License
+
+MIT

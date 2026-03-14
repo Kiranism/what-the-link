@@ -5,7 +5,9 @@
     "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
-      "@bookmark/ui/*": ["./src/*"]
+      "@bookmark/ui/*": ["./src/*"],
+      "@bookmark/components/ui/*": ["./src/components/*"],
+      "@bookmark/components/reui/*": ["./src/components/reui/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

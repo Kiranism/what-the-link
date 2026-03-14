@@ -1,17 +1,22 @@
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter as createTanStackRouter } from "@tanstack/react-router";
 
 import "./index.css";
 import Loader from "./components/loader";
 import { routeTree } from "./routeTree.gen";
-import { orpc, queryClient } from "./utils/orpc";
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000 },
+  },
+});
 
 export const getRouter = () => {
   const router = createTanStackRouter({
     routeTree,
     scrollRestoration: true,
     defaultPreloadStaleTime: 0,
-    context: { orpc, queryClient },
+    context: { queryClient },
     defaultPendingComponent: () => <Loader />,
     defaultNotFoundComponent: () => <div>Not Found</div>,
     Wrap: ({ children }) => (

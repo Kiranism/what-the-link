@@ -23,7 +23,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
-      "@bookmark/ui/*": ["../../packages/ui/src/*"]
+      "@bookmark/ui/*": ["../../packages/ui/src/*"],
+      "@bookmark/components/ui/*": ["../../packages/ui/src/components/*"],
+      "@bookmark/components/reui/*": ["../../packages/ui/src/components/reui/*"]
     }
   }
 }

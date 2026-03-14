@@ -1,0 +1,51 @@
+# WhatsApp Bookmark Manager - Fly.io
+# See: https://fly.io/docs/reference/configuration/
+
+app = "whatsapp-bookmarks"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+  WA_AUTH_DIR = "/data/whatsapp_auth"
+  DB_PATH = "/data/bookmarks.db"
+
+# For Turso: set DATABASE_URL via secrets
+# flyctl secrets set DATABASE_URL="libsql://..."
+# For file-based SQLite: use file:/data/bookmarks.db
+# flyctl secrets set DATABASE_URL="file:/data/bookmarks.db"
+
+[[services]]
+  internal_port = 3000
+  protocol = "tcp"
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.http_checks]]
+    interval = 10000
+    timeout = 2000
+    grace_period = "10s"
+    method = "GET"
+    path = "/health"
+
+[mounts]
+  source = "whatsapp_data"
+  destination = "/data"
+  initial_size = "1gb"

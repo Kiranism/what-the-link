@@ -49,3 +49,10 @@ coverage
 .cache
 tmp
 temp
+
+# App data (SQLite DB, WhatsApp auth sessions)
+data/
+apps/server/data/
+*.db
+*.db-journal
+*.db-wal

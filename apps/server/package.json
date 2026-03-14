@@ -10,15 +10,14 @@
     "start": "node dist/index.mjs"
   },
   "dependencies": {
-    "@bookmark/api": "*",
     "@bookmark/db": "*",
     "@bookmark/env": "*",
     "@hono/node-server": "^1.14.4",
-    "@orpc/openapi": "^1.12.2",
-    "@orpc/server": "^1.12.2",
-    "@orpc/zod": "^1.12.2",
+    "@whiskeysockets/baileys": "6.7.18",
+    "cheerio": "^1.0.0",
     "dotenv": "^17.2.2",
     "hono": "^4.8.2",
+    "qrcode": "^1.5.4",
     "zod": "^4.1.13"
   },
   "devDependencies": {
