@@ -56,7 +56,7 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
 
 ## Deploy to Render (one click)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Kiranism/what-the-link)
 
 Click the button above, set `APP_PASSWORD` when prompted, and you're done. The `render.yaml` blueprint handles everything (Docker build, persistent disk for SQLite + WhatsApp auth).
 
