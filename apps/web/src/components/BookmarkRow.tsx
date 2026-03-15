@@ -47,33 +47,31 @@ export const BookmarkRow = memo(function BookmarkRow({
           className="hidden sm:flex cursor-pointer flex-row items-center justify-between gap-4 px-5 py-3"
           onClick={onToggleExpanded}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {bookmark.favicon ? (
-                <img
-                  src={bookmark.favicon}
-                  alt=""
-                  width={16}
-                  height={16}
-                  className="size-4 shrink-0 rounded-sm"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="size-4 shrink-0 rounded-sm bg-muted" />
-              )}
-              <a
-                href={bookmark.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-sm font-medium text-foreground no-underline hover:text-primary hover:no-underline"
-                onClick={(event) => event.stopPropagation()}
-              >
-                {bookmark.title || bookmark.url}
-              </a>
-              <span className="truncate text-xs text-muted-foreground/60">
-                {bookmark.domain}
-              </span>
-            </div>
+          <div className="flex items-center gap-2.5 min-w-0">
+            {bookmark.favicon ? (
+              <img
+                src={bookmark.favicon}
+                alt=""
+                width={16}
+                height={16}
+                className="size-4 shrink-0 rounded-sm"
+                loading="lazy"
+              />
+            ) : (
+              <div className="size-4 shrink-0 rounded-sm bg-muted" />
+            )}
+            <a
+              href={bookmark.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate max-w-[60%] text-sm font-medium text-foreground no-underline hover:text-primary hover:no-underline"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {bookmark.title || bookmark.url}
+            </a>
+            <span className="truncate text-xs text-muted-foreground/60 shrink-0">
+              {bookmark.domain}
+            </span>
           </div>
 
           <div className="relative flex items-center shrink-0">

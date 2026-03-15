@@ -141,7 +141,7 @@ export function WhatsAppGroupSettings() {
         </div>
         <CardDescription>
           Search known groups locally and save a single group filter.
-          Press \u201cRefresh groups\u201d to re-fetch the latest list from WhatsApp.
+          Press {"\u201c"}Refresh groups{"\u201d"} to re-fetch the latest list from WhatsApp.
         </CardDescription>
       </CardHeader>
       <CardContent>
