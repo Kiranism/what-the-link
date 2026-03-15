@@ -14,9 +14,11 @@ const REPO_ROOT = path.resolve(__dirname, "../../..");
 
 function resolveDatabaseUrl(url: string): string {
   if (!url.startsWith("file:")) return url;
-  const urlPath = url.slice(5).replace(/^\/+/, "");
-  if (path.isAbsolute(urlPath)) return url;
-  const absolutePath = path.join(REPO_ROOT, path.normalize(urlPath));
+  const rawPath = url.slice(5);
+  // Absolute path (e.g. file:/data/bookmarks.db) — use as-is
+  if (rawPath.startsWith("/")) return url;
+  // Relative path (e.g. file:./data/bookmarks.db) — resolve from repo root
+  const absolutePath = path.join(REPO_ROOT, path.normalize(rawPath));
   return `file:${absolutePath}`;
 }
 
