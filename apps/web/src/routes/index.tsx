@@ -20,7 +20,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type { Bookmark } from "@bookmark/types";
-import { SearchIcon } from "lucide-react";
+import { SearchIcon, MessageCircle, BookmarkPlus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 
 import {
   AlertDialog,
@@ -41,7 +42,8 @@ import {
 } from "@bookmark/ui/components/input-group";
 import { Kbd, KbdGroup } from "@bookmark/ui/components/kbd";
 import { toast } from "sonner";
-import { fetchBookmarks } from "../utils/api";
+import { Button } from "@bookmark/ui/components/button";
+import { fetchBookmarks, getWhatsAppStatus } from "../utils/api";
 import { useLibraryShortcuts } from "../hooks/useKeyboardShortcuts";
 import {
   useDeleteBookmarkMutation,
@@ -78,6 +80,12 @@ function HomePage() {
         limit: pagination.pageSize,
         offset: pagination.pageIndex * pagination.pageSize,
       }),
+  });
+
+  const { data: whatsappStatus } = useQuery({
+    queryKey: ["whatsapp", "status"],
+    queryFn: getWhatsAppStatus,
+    staleTime: 30_000,
   });
 
   const deleteMutation = useDeleteBookmarkMutation();
@@ -315,43 +323,80 @@ function HomePage() {
 
       {/* Table */}
       <div ref={tableRef}>
-        <DataGrid
-          table={table}
-          recordCount={total}
-          isLoading={isLoading}
-          loadingMode="skeleton"
-          emptyMessage="No bookmarks yet — press / to search or add your first bookmark"
-          tableLayout={{ headerBackground: false, rowBorder: true }}
-        >
-          <div className="space-y-4">
-            <div
-              role="listbox"
-              aria-label="Bookmarks"
-              aria-activedescendant={activeDescendantId}
-              className="flex flex-col gap-1.5 sm:gap-2"
-            >
-              {table.getRowModel().rows.map((row, index) => (
-                <BookmarkRow
-                  key={row.id}
-                  bookmark={row.original}
-                  isFocused={index === focusedIndex}
-                  isCopied={copiedBookmarkId === row.original.id}
-                  isExpanded={row.getIsExpanded()}
-                  onToggleExpanded={row.getToggleExpandedHandler()}
-                  onOpenLink={handleOpenLink}
-                  onDelete={handleDelete}
-                  isPendingDelete={deleteMutation.isPending}
-                />
-              ))}
-            </div>
-            {total > 10 && (
-              <DataGridPagination
-                sizes={[10, 25, 50]}
-                className="px-2 py-0 min-h-0"
-              />
+        {!isLoading && total === 0 && !deferredSearch ? (
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center gap-4">
+            {whatsappStatus?.connected ? (
+              <>
+                <div className="rounded-full bg-muted p-4">
+                  <BookmarkPlus className="size-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-medium">No bookmarks yet</h3>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    Start sending links to your connected WhatsApp to save
+                    bookmarks.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rounded-full bg-muted p-4">
+                  <MessageCircle className="size-8 text-muted-foreground" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-lg font-medium">
+                    Connect WhatsApp to get started
+                  </h3>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    Link your WhatsApp account to start saving bookmarks by
+                    simply sending links.
+                  </p>
+                </div>
+                <Button render={<Link to="/settings" />}>
+                  Proceed with WhatsApp setup
+                </Button>
+              </>
             )}
           </div>
-        </DataGrid>
+        ) : (
+          <DataGrid
+            table={table}
+            recordCount={total}
+            isLoading={isLoading}
+            loadingMode="skeleton"
+            emptyMessage="No bookmarks match your search"
+            tableLayout={{ headerBackground: false, rowBorder: true }}
+          >
+            <div className="space-y-4">
+              <div
+                role="listbox"
+                aria-label="Bookmarks"
+                aria-activedescendant={activeDescendantId}
+                className="flex flex-col gap-1.5 sm:gap-2"
+              >
+                {table.getRowModel().rows.map((row, index) => (
+                  <BookmarkRow
+                    key={row.id}
+                    bookmark={row.original}
+                    isFocused={index === focusedIndex}
+                    isCopied={copiedBookmarkId === row.original.id}
+                    isExpanded={row.getIsExpanded()}
+                    onToggleExpanded={row.getToggleExpandedHandler()}
+                    onOpenLink={handleOpenLink}
+                    onDelete={handleDelete}
+                    isPendingDelete={deleteMutation.isPending}
+                  />
+                ))}
+              </div>
+              {total > 10 && (
+                <DataGridPagination
+                  sizes={[10, 25, 50]}
+                  className="px-2 py-0 min-h-0"
+                />
+              )}
+            </div>
+          </DataGrid>
+        )}
       </div>
 
       {/* Delete confirmation */}

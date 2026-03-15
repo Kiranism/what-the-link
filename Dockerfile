@@ -51,7 +51,9 @@ COPY --from=builder /app/packages/config ./packages/config
 
 RUN mkdir -p /app/data/whatsapp_auth
 
+COPY entrypoint.sh ./
+RUN chmod +x entrypoint.sh
+
 EXPOSE 3000
 
-# Server output may be index.mjs or index.js depending on tsdown
-CMD ["node", "apps/server/dist/index.mjs"]
+ENTRYPOINT ["./entrypoint.sh"]

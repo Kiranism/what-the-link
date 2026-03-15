@@ -4,11 +4,11 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
 
 ## Features
 
-- **WhatsApp integration** — Send a link in any chat; it’s saved automatically (via Baileys)
+- **WhatsApp integration** — Send a link in any chat; it's saved automatically (via Baileys)
 - **Metadata** — Title, description, and image from Open Graph
-- **Web UI** — Search, filter by tags/domain, favorites, tag editing
+- **Web UI** — Search, filter by tags/domain, favorites, keyboard shortcuts
 - **Single user** — Password-protected; no OAuth
-- **Free-tier friendly** — Designed for Fly.io (or similar) with SQLite/Turso
+- **Self-hosted** — Runs on any VPS with Docker (Oracle Cloud free tier works great)
 
 ## Tech Stack
 
@@ -17,110 +17,82 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
 - **Database:** SQLite (Turso / libsql), Drizzle ORM
 - **WhatsApp:** Baileys (unofficial Web API)
 
-## Quick Start (local)
+## Quick Start (local dev)
 
-1. **Install and env**
+```bash
+# 1. Install
+git clone https://github.com/Kiranism/what-the-link.git
+cd what-the-link
+npm install
+cp .env.example apps/server/.env
 
-   ```bash
-   npm install
-   cp .env.example apps/server/.env
-   ```
+# 2. Set APP_PASSWORD in apps/server/.env
 
-2. **Set in `apps/server/.env`:**
-   - `DATABASE_URL` — e.g. `file:./data/bookmarks.db` or a Turso URL
-   - `APP_PASSWORD` — Password for the web UI and API
+# 3. Database
+npm run db:push
 
-3. **Database**
+# 4. Run
+npm run dev
+```
 
-   ```bash
-   npm run db:push
-   # or: npm run db:generate && npm run db:migrate
-   ```
+- Web: http://localhost:3001
+- API: http://localhost:3000
 
-4. **Run**
+Open the web app, enter your password, go to **Settings**, scan the QR with WhatsApp, and start sending links.
 
-   ```bash
-   npm run dev
-   ```
+## Deploy (Docker)
 
-   - Web: [http://localhost:3001](http://localhost:3001)
-   - API: [http://localhost:3000](http://localhost:3000)
-   - WhatsApp QR: [http://localhost:3000/api/whatsapp/qr](http://localhost:3000/api/whatsapp/qr)
+```bash
+git clone https://github.com/Kiranism/what-the-link.git
+cd what-the-link
+echo 'APP_PASSWORD=your-secure-password' > .env
+docker compose up -d --build
+```
 
-5. **First use**
-   - Open the web app, enter `APP_PASSWORD`.
-   - Go to **Setup**, scan the QR with WhatsApp (Linked devices).
-   - Send a link in any WhatsApp chat; it should appear under **Bookmarks**.
+Open `http://<your-server-ip>:3000`.
 
-## Deploy to Fly.io
+See [deploy.md](deploy.md) for the full guide — domain setup, HTTPS, backups, migration, and troubleshooting.
 
-1. **Fork/clone** and install [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/).
+## Environment Variables
 
-2. **Create app and volume**
-
-   ```bash
-   flyctl launch
-   flyctl volumes create whatsapp_data --size 1 --region sin
-   ```
-
-3. **Secrets**
-
-   ```bash
-   flyctl secrets set APP_PASSWORD="your-secure-password"
-   flyctl secrets set DATABASE_URL="file:/data/bookmarks.db"
-   ```
-
-4. **Deploy**
-
-   ```bash
-   flyctl deploy
-   ```
-
-5. **Connect WhatsApp**
-   - Open `https://<your-app>.fly.dev/api/whatsapp/qr`
-   - Scan with WhatsApp → Linked devices → Link a device.
-
-6. **Use the app**
-   - Open `https://<your-app>.fly.dev`, enter your password, then use Bookmarks / Search / Setup / Settings.
-
-### GitHub Actions
-
-To deploy on push to `main`, add `FLY_API_TOKEN` to the repo secrets and use the workflow in `.github/workflows/deploy.yml`.
-
-## Environment variables
-
-| Variable       | Required | Description                                            |
-| -------------- | -------- | ------------------------------------------------------ |
-| `DATABASE_URL` | Yes      | SQLite/Turso URL or `file:...` path                    |
-| `APP_PASSWORD` | Yes      | Password for API and web UI                            |
-| `WA_AUTH_DIR`  | No       | WhatsApp session dir (default: `./data/whatsapp_auth`) |
-| `CORS_ORIGIN`  | No       | CORS origin (default: `*`)                             |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `APP_PASSWORD` | Yes | Password for web UI and API |
+| `DATABASE_URL` | No | SQLite path (default: `file:/data/bookmarks.db`) |
+| `WA_AUTH_DIR` | No | WhatsApp session dir (default: `/data/whatsapp_auth`) |
+| `WA_ALLOWED_GROUP_JID` | No | Limit bookmarks to one WhatsApp group |
+| `CORS_ORIGIN` | No | CORS origin (default: `*`) |
 
 ## API
 
-- `GET /health` — Health check (no auth).
-- `GET /api/whatsapp/qr` — Current QR payload (no auth).
-- `GET /api/whatsapp/status` — Connection status.
-- `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `favorite`, `archived`, `limit`, `offset`). Auth: `Authorization: Bearer <APP_PASSWORD>`.
-- `GET /api/bookmarks/:id` — One bookmark.
-- `POST /api/bookmarks` — Create (body: `url`, optional `title`, `tags`, etc.).
-- `PATCH /api/bookmarks/:id` — Update.
-- `DELETE /api/bookmarks/:id` — Delete.
+- `GET /health` — Health check (no auth)
+- `GET /api/whatsapp/qr` — QR code for WhatsApp linking (no auth)
+- `GET /api/whatsapp/status` — Connection status
+- `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `favorite`, `archived`, `limit`, `offset`)
+- `GET /api/bookmarks/export?format=json|html` — Export bookmarks
+- `POST /api/bookmarks/import` — Import bookmarks (JSON)
+- `POST /api/bookmarks` — Create bookmark
+- `PATCH /api/bookmarks/:id` — Update
+- `DELETE /api/bookmarks/:id` — Delete
 
-## Project structure
+All `/api/bookmarks/*` and `/api/settings/*` endpoints require `Authorization: Bearer <APP_PASSWORD>`.
+
+## Project Structure
 
 ```
-bookmark/
+what-the-link/
 ├── apps/
-│   ├── web/           # TanStack Start frontend
-│   └── server/       # Hono API + WhatsApp (Baileys)
+│   ├── web/            # TanStack Start frontend
+│   └── server/         # Hono API + WhatsApp (Baileys)
 ├── packages/
-│   ├── db/            # Drizzle schema + migrations
-│   ├── env/            # Env validation
-│   ├── types/         # Shared types
-│   └── ui/            # Shared UI components
+│   ├── db/             # Drizzle schema + migrations
+│   ├── env/            # Env validation (Zod)
+│   ├── types/          # Shared TypeScript types
+│   └── ui/             # Shared UI components
 ├── Dockerfile
-├── fly.toml
+├── docker-compose.yml
+├── deploy.md           # Full deployment guide
+├── knowledge.md        # Architecture deep-dive
 └── .env.example
 ```
 

@@ -55,8 +55,9 @@ bookmark/
 │   ├── types/         # Shared TypeScript types
 │   └── ui/            # Shared UI components (shadcn-style)
 ├── Dockerfile         # Multi-stage build
-├── fly.toml           # Fly.io deployment config
-└── .github/workflows/ # CI/CD (deploy on push to main)
+├── docker-compose.yml # Docker Compose for VPS deployment
+├── deploy.md          # Full deployment guide
+└── knowledge.md       # This file
 ```
 
 ## How It Runs
@@ -153,9 +154,7 @@ flyctl deploy
 
 ### CI/CD (GitHub Actions)
 
-On every push to `main`, the app auto-deploys via `.github/workflows/deploy.yml`.
-
-**Required GitHub secret:** `FLY_API_TOKEN`
+See [deploy.md](deploy.md) for the full step-by-step guide.
 
 ### Health Check
 
