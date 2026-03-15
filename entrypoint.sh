@@ -19,4 +19,7 @@ if [ -z "$APP_PASSWORD" ] || [ "$APP_PASSWORD" = "changeme" ]; then
   exit 1
 fi
 
+# Ensure DATABASE_URL points to the persistent volume
+export DATABASE_URL="${DATABASE_URL:-file:/data/bookmarks.db}"
+
 exec node apps/server/dist/index.mjs

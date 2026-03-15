@@ -10,7 +10,10 @@ if (cwd.endsWith("server") || cwd.includes("apps/server")) {
 }
 dotenv.config(); // cwd .env overrides
 
-const DEFAULT_DATABASE_URL = "file:./data/bookmarks.db";
+const DEFAULT_DATABASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "file:/data/bookmarks.db"
+    : "file:./data/bookmarks.db";
 
 export const env = createEnv({
   server: {
