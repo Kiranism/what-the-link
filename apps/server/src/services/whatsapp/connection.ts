@@ -258,9 +258,13 @@ export async function initWhatsApp(): Promise<void> {
           if (existing) {
             logger.info("Bookmark already exists", { url });
             if (remoteJid && sock) {
-              await sock.sendMessage(remoteJid, {
-                react: { text: "⚠️", key: msg.key },
-              });
+              try {
+                await sock.sendMessage(remoteJid, {
+                  react: { text: "⚠️", key: msg.key },
+                });
+              } catch (reactErr) {
+                logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
+              }
             }
             continue;
           }
@@ -283,17 +287,25 @@ export async function initWhatsApp(): Promise<void> {
           logger.info("Bookmark saved", { url, title: metadata.title, tags });
 
           if (remoteJid && sock) {
-            await sock.sendMessage(remoteJid, {
-              react: { text: "🔖", key: msg.key },
-            });
+            try {
+              await sock.sendMessage(remoteJid, {
+                react: { text: "🔖", key: msg.key },
+              });
+            } catch (reactErr) {
+              logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
+            }
           }
         } catch (error) {
           logger.error("Failed to save bookmark", { url, error });
 
           if (remoteJid && sock) {
-            await sock.sendMessage(remoteJid, {
-              react: { text: "❌", key: msg.key },
-            });
+            try {
+              await sock.sendMessage(remoteJid, {
+                react: { text: "❌", key: msg.key },
+              });
+            } catch (reactErr) {
+              logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
+            }
           }
         }
       }
