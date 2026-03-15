@@ -59,8 +59,24 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
     const domain = new URL(url).hostname;
     const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
+    let cleanTitle = title?.trim().slice(0, 500);
+
+    // If the title contains the description (common on GitHub, etc.),
+    // strip the description portion to keep the title short.
+    if (cleanTitle && description) {
+      const descTrimmed = description.trim();
+      const idx = cleanTitle.indexOf(descTrimmed);
+      if (idx !== -1) {
+        // Remove the description and any leading separator like ": " or " - "
+        cleanTitle = (cleanTitle.slice(0, idx) + cleanTitle.slice(idx + descTrimmed.length))
+          .replace(/[\s:|\-–—]+$/, "")
+          .replace(/^[\s:|\-–—]+/, "")
+          .trim();
+      }
+    }
+
     return {
-      title: title?.trim().slice(0, 500),
+      title: cleanTitle || undefined,
       description: description?.trim().slice(0, 1000),
       image: resolveUrl(image),
       favicon,
