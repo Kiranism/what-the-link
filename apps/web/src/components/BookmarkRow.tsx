@@ -47,7 +47,7 @@ export const BookmarkRow = memo(function BookmarkRow({
           className="hidden sm:flex cursor-pointer flex-row items-center justify-between gap-4 px-5 py-3"
           onClick={onToggleExpanded}
         >
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
             {bookmark.favicon ? (
               <img
                 src={bookmark.favicon}
@@ -64,7 +64,7 @@ export const BookmarkRow = memo(function BookmarkRow({
               href={bookmark.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="truncate max-w-[60%] text-sm font-medium text-foreground no-underline hover:text-primary hover:no-underline"
+              className="truncate text-sm font-medium text-foreground no-underline hover:text-primary hover:no-underline"
               onClick={(event) => event.stopPropagation()}
             >
               {bookmark.title || bookmark.url}
