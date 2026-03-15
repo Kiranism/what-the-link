@@ -1,4 +1,4 @@
-# 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)_/¯
+# 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)\_/¯
 
 Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fetches metadata, and provides a web UI for searching and organizing bookmarks.
 
@@ -51,17 +51,17 @@ docker compose up -d --build
 
 Open `http://<your-server-ip>:3000`.
 
-See [deploy.md](deploy.md) for the full guide — domain setup, HTTPS, backups, migration, and troubleshooting.
+See [how-to-deploy.md](how-to-deploy.md) for the full guide — domain setup, HTTPS, backups, migration, and troubleshooting.
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `APP_PASSWORD` | Yes | Password for web UI and API |
-| `DATABASE_URL` | No | SQLite path (default: `file:/data/bookmarks.db`) |
-| `WA_AUTH_DIR` | No | WhatsApp session dir (default: `/data/whatsapp_auth`) |
-| `WA_ALLOWED_GROUP_JID` | No | Limit bookmarks to one WhatsApp group |
-| `CORS_ORIGIN` | No | CORS origin (default: `*`) |
+| Variable               | Required | Description                                           |
+| ---------------------- | -------- | ----------------------------------------------------- |
+| `APP_PASSWORD`         | Yes      | Password for web UI and API                           |
+| `DATABASE_URL`         | No       | SQLite path (default: `file:/data/bookmarks.db`)      |
+| `WA_AUTH_DIR`          | No       | WhatsApp session dir (default: `/data/whatsapp_auth`) |
+| `WA_ALLOWED_GROUP_JID` | No       | Limit bookmarks to one WhatsApp group                 |
+| `CORS_ORIGIN`          | No       | CORS origin (default: `*`)                            |
 
 ## API
 
@@ -91,7 +91,7 @@ what-the-link/
 │   └── ui/             # Shared UI components
 ├── Dockerfile
 ├── docker-compose.yml
-├── deploy.md           # Full deployment guide
+├── how-to-deploy.md           # Full deployment guide
 ├── knowledge.md        # Architecture deep-dive
 └── .env.example
 ```

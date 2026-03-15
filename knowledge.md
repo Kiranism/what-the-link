@@ -1,4 +1,4 @@
-# Knowledge Base — 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)_/¯
+# Knowledge Base — 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)\_/¯
 
 ## Architecture Overview
 
@@ -56,7 +56,7 @@ bookmark/
 │   └── ui/            # Shared UI components (shadcn-style)
 ├── Dockerfile         # Multi-stage build
 ├── docker-compose.yml # Docker Compose for VPS deployment
-├── deploy.md          # Full deployment guide
+├── how-to-deploy.md          # Full deployment guide
 └── knowledge.md       # This file
 ```
 
@@ -66,10 +66,10 @@ bookmark/
 
 Two dev servers running simultaneously:
 
-| Process         | Port | What it does                       |
-|-----------------|------|------------------------------------|
-| `apps/server`   | 3000 | Hono API + WhatsApp (via `tsx`)    |
-| `apps/web`      | 3001 | Vite dev server (HMR, SSR)        |
+| Process       | Port | What it does                    |
+| ------------- | ---- | ------------------------------- |
+| `apps/server` | 3000 | Hono API + WhatsApp (via `tsx`) |
+| `apps/web`    | 3001 | Vite dev server (HMR, SSR)      |
 
 Web app calls API at `VITE_SERVER_URL=http://localhost:3000`.
 
@@ -94,11 +94,11 @@ Single process serves everything:
 
 **ORM:** Drizzle
 
-| Mode       | DATABASE_URL                        | Notes                              |
-|------------|-------------------------------------|------------------------------------|
-| Local dev  | `file:./data/bookmarks.db`          | File in `apps/server/data/`        |
-| Production | `file:/data/bookmarks.db`           | On persistent volume               |
-| Turso      | `libsql://your-db.turso.io?token=…` | Serverless edge DB (optional)      |
+| Mode       | DATABASE_URL                        | Notes                         |
+| ---------- | ----------------------------------- | ----------------------------- |
+| Local dev  | `file:./data/bookmarks.db`          | File in `apps/server/data/`   |
+| Production | `file:/data/bookmarks.db`           | On persistent volume          |
+| Turso      | `libsql://your-db.turso.io?token=…` | Serverless edge DB (optional) |
 
 **Tables:** `bookmarks`, `app_settings`, `tags`
 
@@ -113,24 +113,26 @@ npm run db:studio    # Drizzle Studio GUI
 
 ## Environment Variables
 
-| Variable              | Required | Where       | Description                                     |
-|-----------------------|----------|-------------|-------------------------------------------------|
-| `DATABASE_URL`        | Yes      | Server      | SQLite file path or Turso URL                   |
-| `APP_PASSWORD`        | Yes      | Server      | Password for web UI login and API Bearer token  |
-| `CORS_ORIGIN`         | No       | Server      | Allowed CORS origin (default: `*`)              |
-| `WA_AUTH_DIR`         | No       | Server      | WhatsApp session dir (default: `./data/whatsapp_auth`) |
-| `WA_ALLOWED_GROUP_JID`| No      | Server      | Filter bookmarks to one WhatsApp group          |
-| `NODE_ENV`            | No       | Server      | `development` / `production` / `test`           |
-| `PORT`                | No       | Server      | HTTP port (default: `3000`)                     |
-| `VITE_SERVER_URL`     | No       | Web (build) | API base URL — clear for production (same origin) |
+| Variable               | Required | Where       | Description                                            |
+| ---------------------- | -------- | ----------- | ------------------------------------------------------ |
+| `DATABASE_URL`         | Yes      | Server      | SQLite file path or Turso URL                          |
+| `APP_PASSWORD`         | Yes      | Server      | Password for web UI login and API Bearer token         |
+| `CORS_ORIGIN`          | No       | Server      | Allowed CORS origin (default: `*`)                     |
+| `WA_AUTH_DIR`          | No       | Server      | WhatsApp session dir (default: `./data/whatsapp_auth`) |
+| `WA_ALLOWED_GROUP_JID` | No       | Server      | Filter bookmarks to one WhatsApp group                 |
+| `NODE_ENV`             | No       | Server      | `development` / `production` / `test`                  |
+| `PORT`                 | No       | Server      | HTTP port (default: `3000`)                            |
+| `VITE_SERVER_URL`      | No       | Web (build) | API base URL — clear for production (same origin)      |
 
 ## Deployment on Fly.io
 
 ### What you need
+
 - [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/) installed
 - A Fly.io account
 
 ### Infrastructure
+
 - **1 machine** — shared CPU, 1GB RAM
 - **1 volume** — 1GB at `/data` (stores DB + WhatsApp auth)
 - **Region** — `bom` (Mumbai) by default, change in `fly.toml`
@@ -154,7 +156,7 @@ flyctl deploy
 
 ### CI/CD (GitHub Actions)
 
-See [deploy.md](deploy.md) for the full step-by-step guide.
+See [how-to-deploy.md](how-to-deploy.md) for the full step-by-step guide.
 
 ### Health Check
 
@@ -165,25 +167,28 @@ Fly checks every 10s, 2s timeout, 10s grace period on startup.
 ## Hosting Elsewhere
 
 Since it's a standard Docker container, you can host anywhere that supports:
+
 - Docker containers
 - Persistent volumes (for `/data`)
 - Port 3000 exposed
 
 ### Requirements
+
 1. **Persistent storage** at `/data` — the SQLite database and WhatsApp session must survive restarts
 2. **Single instance** — SQLite doesn't support concurrent writers, so run only 1 container
 3. **Always-on** — WhatsApp connection drops if the container sleeps (no serverless)
 
 ### Example platforms
-| Platform       | Persistent Volume | Always-on | Notes                         |
-|----------------|-------------------|-----------|-------------------------------|
-| **Fly.io**     | Yes (volumes)     | Yes       | Recommended, config included  |
-| **Railway**    | Yes               | Yes       | Works out of the box          |
-| **Render**     | Yes (disks)       | Yes       | Use "Background Worker" type  |
-| **VPS** (any)  | Yes (filesystem)  | Yes       | docker-compose, bind mount    |
-| **Coolify**    | Yes               | Yes       | Self-hosted PaaS              |
-| Vercel/Netlify | No                | No        | Won't work (serverless)       |
-| AWS Lambda     | No                | No        | Won't work (no persistence)   |
+
+| Platform       | Persistent Volume | Always-on | Notes                        |
+| -------------- | ----------------- | --------- | ---------------------------- |
+| **Fly.io**     | Yes (volumes)     | Yes       | Recommended, config included |
+| **Railway**    | Yes               | Yes       | Works out of the box         |
+| **Render**     | Yes (disks)       | Yes       | Use "Background Worker" type |
+| **VPS** (any)  | Yes (filesystem)  | Yes       | docker-compose, bind mount   |
+| **Coolify**    | Yes               | Yes       | Self-hosted PaaS             |
+| Vercel/Netlify | No                | No        | Won't work (serverless)      |
+| AWS Lambda     | No                | No        | Won't work (no persistence)  |
 
 ### docker-compose (VPS)
 
@@ -236,6 +241,7 @@ The server bundle includes all `@bookmark/*` packages (db, env, types) — no ex
 **Library:** Baileys (unofficial WhatsApp Web API)
 
 **How it works:**
+
 1. On startup, server connects to WhatsApp using stored session in `WA_AUTH_DIR`
 2. If no session → generates QR code at `/api/whatsapp/qr`
 3. User scans QR with WhatsApp → Linked Devices
@@ -244,11 +250,10 @@ The server bundle includes all `@bookmark/*` packages (db, env, types) — no ex
 6. Bot responds in chat with confirmation
 
 **Commands (in WhatsApp):**
+
 - Send any URL → saves as bookmark
 - `#tag1 #tag2` with URL → adds tags
 
 - `?<query>` → searches bookmarks
-
-
 
 **Important:** WhatsApp session persists in `/data/whatsapp_auth`. If this directory is lost, you'll need to re-scan the QR code.
