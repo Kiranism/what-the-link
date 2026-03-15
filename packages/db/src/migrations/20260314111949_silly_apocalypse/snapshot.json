@@ -118,16 +118,6 @@
       "autoincrement": false,
       "default": "false",
       "generated": null,
-      "name": "is_favorite",
-      "entityType": "columns",
-      "table": "bookmarks"
-    },
-    {
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
-      "default": "false",
-      "generated": null,
       "name": "is_read",
       "entityType": "columns",
       "table": "bookmarks"
@@ -343,20 +333,6 @@
       "where": null,
       "origin": "manual",
       "name": "idx_bookmarks_domain",
-      "entityType": "indexes",
-      "table": "bookmarks"
-    },
-    {
-      "columns": [
-        {
-          "value": "is_favorite",
-          "isExpression": false
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "origin": "manual",
-      "name": "idx_bookmarks_favorite",
       "entityType": "indexes",
       "table": "bookmarks"
     },
