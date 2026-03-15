@@ -25,7 +25,7 @@ const links = [
 ] as const;
 
 export default function Header() {
-  const { isAuthenticated, setPassword } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
 
   const { data: unreadData } = useQuery({
     queryKey: ["bookmarks", "unread-count"],
@@ -90,7 +90,7 @@ export default function Header() {
               <UserIcon aria-hidden="true" className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" sideOffset={8}>
-              <DropdownMenuItem onClick={() => setPassword(null)}>
+              <DropdownMenuItem onClick={() => logout()}>
                 <LogOutIcon aria-hidden="true" className="size-3.5" />
                 Log out
               </DropdownMenuItem>

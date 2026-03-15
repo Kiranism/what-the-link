@@ -3,23 +3,15 @@ import type { CreateBookmarkBody, UpdateBookmarkBody } from "@bookmark/types/api
 
 const API_BASE = (import.meta.env.VITE_SERVER_URL ?? "") + "/api";
 
-let cachedPassword: string | null = null;
-
-/** Update the cached auth token. Called from useAuth when password changes. */
-export function setAuthToken(token: string | null) {
-  cachedPassword = token;
-}
-
-function getAuthHeaders(): HeadersInit {
-  const password = cachedPassword ?? (typeof window !== "undefined" ? localStorage.getItem("app_password") : null);
-  if (!password) {
-    throw new Error("Not authenticated");
-  }
-  if (!cachedPassword) cachedPassword = password;
-  return {
-    Authorization: `Bearer ${password}`,
-    "Content-Type": "application/json",
-  };
+function authFetch(input: string, init?: RequestInit): Promise<Response> {
+  return fetch(input, {
+    ...init,
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+      ...init?.headers,
+    },
+  });
 }
 
 export interface FetchBookmarksParams {
@@ -46,17 +38,13 @@ export async function fetchBookmarks(
   if (params.limit != null) searchParams.set("limit", String(params.limit));
   if (params.offset != null) searchParams.set("offset", String(params.offset));
 
-  const res = await fetch(`${API_BASE}/bookmarks?${searchParams}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await authFetch(`${API_BASE}/bookmarks?${searchParams}`);
   if (!res.ok) throw new Error("Failed to fetch bookmarks");
   return res.json();
 }
 
 export async function fetchBookmark(id: number): Promise<Bookmark> {
-  const res = await fetch(`${API_BASE}/bookmarks/${id}`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await authFetch(`${API_BASE}/bookmarks/${id}`);
   if (!res.ok) throw new Error("Failed to fetch bookmark");
   return res.json();
 }
@@ -64,9 +52,8 @@ export async function fetchBookmark(id: number): Promise<Bookmark> {
 export async function createBookmark(
   body: CreateBookmarkBody,
 ): Promise<Bookmark> {
-  const res = await fetch(`${API_BASE}/bookmarks`, {
+  const res = await authFetch(`${API_BASE}/bookmarks`, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -80,9 +67,8 @@ export async function updateBookmark(
   id: number,
   data: UpdateBookmarkBody,
 ): Promise<Bookmark> {
-  const res = await fetch(`${API_BASE}/bookmarks/${id}`, {
+  const res = await authFetch(`${API_BASE}/bookmarks/${id}`, {
     method: "PATCH",
-    headers: getAuthHeaders(),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error("Failed to update bookmark");
@@ -90,9 +76,8 @@ export async function updateBookmark(
 }
 
 export async function deleteBookmark(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/bookmarks/${id}`, {
+  const res = await authFetch(`${API_BASE}/bookmarks/${id}`, {
     method: "DELETE",
-    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to delete bookmark");
 }
@@ -103,9 +88,7 @@ export interface TagCount {
 }
 
 export async function fetchTags(): Promise<TagCount[]> {
-  const res = await fetch(`${API_BASE}/bookmarks/tags`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await authFetch(`${API_BASE}/bookmarks/tags`);
   if (!res.ok) throw new Error("Failed to fetch tags");
   const data = (await res.json()) as { tags: TagCount[] };
   return data.tags ?? [];
@@ -118,9 +101,8 @@ export async function bulkUpdateBookmarks(
   action: BulkAction,
   tags?: string[],
 ): Promise<{ success: boolean; affected: number }> {
-  const res = await fetch(`${API_BASE}/bookmarks/bulk`, {
+  const res = await authFetch(`${API_BASE}/bookmarks/bulk`, {
     method: "POST",
-    headers: getAuthHeaders(),
     body: JSON.stringify({ ids, action, tags }),
   });
   if (!res.ok) throw new Error("Bulk operation failed");
@@ -129,9 +111,8 @@ export async function bulkUpdateBookmarks(
 
 
 export async function refreshBookmarkMetadata(id: number): Promise<Bookmark> {
-  const res = await fetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
+  const res = await authFetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
     method: "POST",
-    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to refresh metadata");
   return res.json();
@@ -142,13 +123,13 @@ export async function getWhatsAppStatus(): Promise<{
   phoneNumber?: string;
   lastDisconnectCode?: number;
 }> {
-  const res = await fetch(`${API_BASE}/whatsapp/status`);
+  const res = await authFetch(`${API_BASE}/whatsapp/status`);
   if (!res.ok) throw new Error("Failed to get WhatsApp status");
   return res.json();
 }
 
 export async function reconnectWhatsApp(): Promise<void> {
-  const res = await fetch(`${API_BASE}/whatsapp/reconnect`, {
+  const res = await authFetch(`${API_BASE}/whatsapp/reconnect`, {
     method: "POST",
   });
   if (!res.ok) throw new Error("Failed to reconnect");
@@ -160,7 +141,7 @@ export async function getWhatsAppQR(): Promise<{
   phoneNumber?: string;
   message?: string;
 }> {
-  const res = await fetch(`${API_BASE}/whatsapp/qr`);
+  const res = await authFetch(`${API_BASE}/whatsapp/qr`);
   if (!res.ok) throw new Error("Failed to get QR");
   return res.json();
 }
@@ -170,9 +151,7 @@ export interface AppSettings {
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
-  const res = await fetch(`${API_BASE}/settings`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await authFetch(`${API_BASE}/settings`);
   if (!res.ok) throw new Error("Failed to fetch settings");
   return res.json();
 }
@@ -180,9 +159,8 @@ export async function fetchSettings(): Promise<AppSettings> {
 export async function updateSettings(
   patch: Partial<AppSettings>,
 ): Promise<AppSettings> {
-  const res = await fetch(`${API_BASE}/settings`, {
+  const res = await authFetch(`${API_BASE}/settings`, {
     method: "PATCH",
-    headers: getAuthHeaders(),
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error("Failed to update settings");
@@ -195,18 +173,15 @@ export interface WhatsAppGroup {
 }
 
 export async function fetchWhatsAppGroups(): Promise<WhatsAppGroup[]> {
-  const res = await fetch(`${API_BASE}/settings/whatsapp-groups`, {
-    headers: getAuthHeaders(),
-  });
+  const res = await authFetch(`${API_BASE}/settings/whatsapp-groups`);
   if (!res.ok) throw new Error("Failed to fetch WhatsApp groups");
   const data = (await res.json()) as { groups: WhatsAppGroup[] };
   return data.groups ?? [];
 }
 
 export async function refreshWhatsAppGroups(): Promise<WhatsAppGroup[]> {
-  const res = await fetch(`${API_BASE}/settings/whatsapp-groups/refresh`, {
+  const res = await authFetch(`${API_BASE}/settings/whatsapp-groups/refresh`, {
     method: "POST",
-    headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error("Failed to refresh WhatsApp groups");
   const data = (await res.json()) as { groups: WhatsAppGroup[] };

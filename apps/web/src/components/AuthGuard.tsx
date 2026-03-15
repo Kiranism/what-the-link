@@ -26,24 +26,24 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { isAuthenticated, setPassword, validatePassword } = useAuth();
+  const { isAuthenticated, login, validateSession } = useAuth();
   const [input, setInput] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [initialCheck, setInitialCheck] = useState(true);
 
-  // On mount, check stored password on the client to avoid SSR hydration mismatch
+  // On mount, validate existing session cookie against the backend
   useEffect(() => {
-    const stored = localStorage.getItem("app_password");
-    if (stored && !isAuthenticated) {
-      validatePassword(stored).then((valid) => {
+    if (!isAuthenticated) {
+      // Try validating — cookie might still be valid from a previous session
+      validateSession().finally(() => setInitialCheck(false));
+    } else {
+      validateSession().then((valid) => {
         if (!valid) {
           setError("Session expired. Please log in again.");
         }
         setInitialCheck(false);
       });
-    } else {
-      setInitialCheck(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -68,8 +68,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     }
     setLoading(true);
     setError("");
-    setPassword(value);
-    const valid = await validatePassword(value);
+    const valid = await login(value);
     setLoading(false);
     if (valid) {
       setInput("");

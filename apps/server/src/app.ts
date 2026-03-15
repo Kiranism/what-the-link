@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger as honoLogger } from "hono/logger";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { setCookie, deleteCookie } from "hono/cookie";
 import { bookmarksRouter } from "./routes/bookmarks";
 import { settingsRouter } from "./routes/settings";
 import { whatsappRouter } from "./routes/whatsapp";
@@ -21,9 +22,10 @@ app.use("*", honoLogger());
 app.use(
   "*",
   cors({
-    origin: env.CORS_ORIGIN ?? "*",
+    origin: env.CORS_ORIGIN ?? (env.NODE_ENV === "production" ? "same-origin" : "*"),
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   }),
 );
 
@@ -31,6 +33,33 @@ app.get("/health", (c) =>
   c.json({ status: "ok", timestamp: Date.now() }),
 );
 
+// --- Cookie-based login/logout ---
+app.post("/api/login", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const password = (body as { password?: string }).password;
+
+  if (!password || password !== env.APP_PASSWORD) {
+    return c.json({ error: "Invalid password" }, 401);
+  }
+
+  setCookie(c, "session", password, {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "Lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+  });
+
+  return c.json({ success: true });
+});
+
+app.post("/api/logout", (c) => {
+  deleteCookie(c, "session", { path: "/" });
+  return c.json({ success: true });
+});
+
+// --- Protected routes ---
+app.use("/api/whatsapp/*", authMiddleware);
 app.route("/api/whatsapp", whatsappRouter);
 
 app.use("/api/bookmarks/*", authMiddleware);

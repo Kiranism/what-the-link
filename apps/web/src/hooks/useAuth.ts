@@ -1,13 +1,11 @@
 import { useCallback, useSyncExternalStore } from "react";
-import { setAuthToken } from "../utils/api";
 
-const STORAGE_KEY = "app_password";
-const VERIFIED_KEY = "app_password_verified";
+const VERIFIED_KEY = "app_authenticated";
 const API_BASE = (import.meta.env.VITE_SERVER_URL ?? "") + "/api";
 
 // Shared reactive store so all useAuth() instances stay in sync
 let listeners: Array<() => void> = [];
-let snapshot = { password: null as string | null, verified: false };
+let snapshot = { authenticated: false };
 
 function emitChange() {
   snapshot = { ...snapshot };
@@ -26,63 +24,40 @@ function getSnapshot() {
 }
 
 function getServerSnapshot() {
-  return { password: null, verified: false };
+  return { authenticated: false };
 }
 
-// Initialize from localStorage once
+// Initialize from sessionStorage flag (cookie does the real auth)
 if (typeof window !== "undefined") {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  const wasVerified = localStorage.getItem(VERIFIED_KEY) === "true";
-  if (stored) {
-    snapshot = { password: stored, verified: wasVerified };
-    setAuthToken(stored);
+  const wasVerified = sessionStorage.getItem(VERIFIED_KEY) === "true";
+  if (wasVerified) {
+    snapshot = { authenticated: true };
   }
 }
 
 export function useAuth() {
-  const { password, verified } = useSyncExternalStore(
+  const { authenticated } = useSyncExternalStore(
     subscribe,
     getSnapshot,
     getServerSnapshot,
   );
 
-  const setPassword = useCallback((value: string | null) => {
-    if (typeof window === "undefined") return;
-    if (value == null) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(VERIFIED_KEY);
-      snapshot.password = null;
-      snapshot.verified = false;
-      setAuthToken(null);
-    } else {
-      localStorage.setItem(STORAGE_KEY, value);
-      snapshot.password = value;
-      setAuthToken(value);
-    }
-    emitChange();
-  }, []);
-
-  const validatePassword = useCallback(async (pwd: string): Promise<boolean> => {
+  const login = useCallback(async (password: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_BASE}/bookmarks?limit=1`, {
-        headers: {
-          Authorization: `Bearer ${pwd}`,
-          "Content-Type": "application/json",
-        },
+      const res = await fetch(`${API_BASE}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ password }),
       });
       if (res.ok) {
-        localStorage.setItem(VERIFIED_KEY, "true");
-        snapshot.password = pwd;
-        snapshot.verified = true;
-        setAuthToken(pwd);
+        sessionStorage.setItem(VERIFIED_KEY, "true");
+        snapshot.authenticated = true;
         emitChange();
         return true;
       }
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(VERIFIED_KEY);
-      snapshot.password = null;
-      snapshot.verified = false;
-      setAuthToken(null);
+      sessionStorage.removeItem(VERIFIED_KEY);
+      snapshot.authenticated = false;
       emitChange();
       return false;
     } catch {
@@ -90,7 +65,39 @@ export function useAuth() {
     }
   }, []);
 
-  const isAuthenticated = !!password && verified;
+  const logout = useCallback(async () => {
+    try {
+      await fetch(`${API_BASE}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch {
+      // Ignore — clear local state regardless
+    }
+    sessionStorage.removeItem(VERIFIED_KEY);
+    snapshot.authenticated = false;
+    emitChange();
+  }, []);
 
-  return { password, setPassword, isAuthenticated, validatePassword };
+  const validateSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/bookmarks?limit=1`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        sessionStorage.setItem(VERIFIED_KEY, "true");
+        snapshot.authenticated = true;
+        emitChange();
+        return true;
+      }
+      sessionStorage.removeItem(VERIFIED_KEY);
+      snapshot.authenticated = false;
+      emitChange();
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  return { isAuthenticated: authenticated, login, logout, validateSession };
 }
