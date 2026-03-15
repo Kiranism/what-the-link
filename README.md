@@ -6,7 +6,7 @@ Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fe
 
 - **WhatsApp integration** — Send a link in any chat; it's saved automatically (via Baileys)
 - **Metadata** — Title, description, and image from Open Graph
-- **Web UI** — Search, filter by tags/domain, favorites, keyboard shortcuts
+- **Web UI** — Search, filter by tags/domain, keyboard shortcuts
 - **Single user** — Password-protected; no OAuth
 - **Self-hosted** — Runs on any VPS with Docker (Oracle Cloud free tier works great)
 
@@ -68,7 +68,7 @@ See [deploy.md](deploy.md) for the full guide — domain setup, HTTPS, backups, 
 - `GET /health` — Health check (no auth)
 - `GET /api/whatsapp/qr` — QR code for WhatsApp linking (no auth)
 - `GET /api/whatsapp/status` — Connection status
-- `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `favorite`, `archived`, `limit`, `offset`)
+- `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `archived`, `limit`, `offset`)
 - `GET /api/bookmarks/export?format=json|html` — Export bookmarks
 - `POST /api/bookmarks/import` — Import bookmarks (JSON)
 - `POST /api/bookmarks` — Create bookmark

@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { fetchMetadata } from "../metadata";
 import { getCachedWaAllowedGroupJid } from "../settings";
 import { logger } from "../../utils/logger";
-import { extractURLs, extractHashtags, detectFavorite } from "../../utils/url-extractor";
+import { extractURLs, extractHashtags } from "../../utils/url-extractor";
 import { env } from "@bookmark/env/server";
 import {
   makeWASocket,
@@ -15,7 +15,7 @@ import {
 import { Boom } from "@hapi/boom";
 import fs from "fs";
 import pkg from "qrcode";
-import { handleSearchCommand, handleReplyCommand, HELP_TEXT, extractQuestionQuery } from "./commands";
+import { handleSearchCommand, extractQuestionQuery } from "./commands";
 
 const { toDataURL } = pkg;
 
@@ -123,7 +123,6 @@ async function reconnect(): Promise<void> {
   await initWhatsApp();
 }
 
-const REPLY_COMMANDS = ["delete", "archive", "fav", "favorite", "unfav"];
 
 export async function initWhatsApp(): Promise<void> {
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
@@ -227,29 +226,6 @@ export async function initWhatsApp(): Promise<void> {
 
       const remoteJid = msg.key.remoteJid;
 
-      // --- Search command ---
-      const searchMatch = text.match(/^(?:\/)?search(?:\s+(.*))?$/i);
-      if (searchMatch && remoteJid && sock) {
-        await handleSearchCommand(sock, remoteJid, searchMatch[1] ?? "", msg);
-        continue;
-      }
-
-      // --- Help command ---
-      if (/^(?:\/)?help$/i.test(text.trim()) && remoteJid && sock) {
-        await sock.sendMessage(remoteJid, { text: HELP_TEXT }, { quoted: msg });
-        continue;
-      }
-
-      // --- Reply commands ---
-      const quotedStanzaId = (msg.message as any)?.extendedTextMessage?.contextInfo?.stanzaId;
-      if (quotedStanzaId) {
-        const command = text.trim().toLowerCase();
-        if (REPLY_COMMANDS.includes(command) && remoteJid && sock) {
-          await handleReplyCommand(sock, remoteJid, command, quotedStanzaId, msg);
-          continue;
-        }
-      }
-
       // --- Question query: messages starting with "?" ---
       if (remoteJid && sock) {
         const questionQuery = extractQuestionQuery(text);
@@ -259,19 +235,17 @@ export async function initWhatsApp(): Promise<void> {
         }
       }
 
-      // --- URL extraction with hashtag tagging and !fav ---
+      // --- URL extraction with hashtag tagging ---
       const urls = extractURLs(text);
       if (urls.length === 0) continue;
 
       const tags = extractHashtags(text);
-      const isFavorite = detectFavorite(text);
 
       for (const url of urls) {
         try {
           logger.info("Processing URL from WhatsApp", {
             url,
             tags,
-            isFavorite,
             chatJid: (remoteJid ?? "").split(":")[0],
           });
 
@@ -284,11 +258,9 @@ export async function initWhatsApp(): Promise<void> {
           if (existing) {
             logger.info("Bookmark already exists", { url });
             if (remoteJid && sock) {
-              await sock.sendMessage(
-                remoteJid,
-                { text: `⚠️ already saved` },
-                { quoted: msg },
-              );
+              await sock.sendMessage(remoteJid, {
+                react: { text: "⚠️", key: msg.key },
+              });
             }
             continue;
           }
@@ -303,32 +275,25 @@ export async function initWhatsApp(): Promise<void> {
             favicon: metadata.favicon ?? null,
             domain: metadata.domain,
             tags: tags.length > 0 ? tags : [],
-            isFavorite,
             source: "whatsapp",
             whatsappMessageId: msg.key.id,
             metadataStatus: metadata.success ? "complete" : "failed",
           });
 
-          logger.info("Bookmark saved", { url, title: metadata.title, tags, isFavorite });
+          logger.info("Bookmark saved", { url, title: metadata.title, tags });
 
-          const tagInfo = tags.length > 0 ? ` [${tags.join(", ")}]` : "";
-          const favInfo = isFavorite ? " ⭐" : "";
           if (remoteJid && sock) {
-            await sock.sendMessage(
-              remoteJid,
-              { text: `✅ saved${tagInfo}${favInfo}` },
-              { quoted: msg },
-            );
+            await sock.sendMessage(remoteJid, {
+              react: { text: "🔖", key: msg.key },
+            });
           }
         } catch (error) {
           logger.error("Failed to save bookmark", { url, error });
 
           if (remoteJid && sock) {
-            await sock.sendMessage(
-              remoteJid,
-              { text: `❌ failed` },
-              { quoted: msg },
-            );
+            await sock.sendMessage(remoteJid, {
+              react: { text: "❌", key: msg.key },
+            });
           }
         }
       }

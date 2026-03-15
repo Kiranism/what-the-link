@@ -25,9 +25,6 @@ export function extractHashtags(text: string): string[] {
   return Array.from(tags);
 }
 
-export function detectFavorite(text: string): boolean {
-  return text.includes("!fav") || text.includes("\u2B50") || text.includes("\u2606");
-}
 
 export function normalizeUrl(url: string): string {
   const trimmed = url.trim();

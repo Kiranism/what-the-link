@@ -25,21 +25,12 @@ export async function handleSearchCommand(
   quotedMsg: any,
 ): Promise<void> {
   const trimmed = query.trim();
-  if (!trimmed) {
-    await sock.sendMessage(remoteJid, {
-      text: "Usage: search <query>\n\nExamples:\n• search react hooks\n• search #tutorial\n• search fav\n• search recent",
-    }, { quoted: quotedMsg });
-    return;
-  }
+  if (!trimmed) return;
 
   const conditions = [eq(bookmarks.isArchived, false)];
 
-  // Special keyword: "fav" or "favorites"
-  if (trimmed === "fav" || trimmed === "favorites" || trimmed === "⭐") {
-    conditions.push(eq(bookmarks.isFavorite, true));
-  }
   // Tag search: starts with #
-  else if (trimmed.startsWith("#")) {
+  if (trimmed.startsWith("#")) {
     const tag = trimmed.slice(1).toLowerCase();
     if (tag) {
       conditions.push(
@@ -93,8 +84,7 @@ export async function handleSearchCommand(
       const tags = Array.isArray(b.tags) && b.tags.length > 0
         ? `\n   ${b.tags.map((t: string) => `#${t}`).join(" ")}`
         : "";
-      const fav = b.isFavorite ? " ⭐" : "";
-      lines.push(`${i + 1}. ${b.title ?? b.url}${fav}\n   ${b.url}${tags}`);
+      lines.push(`${i + 1}. ${b.title ?? b.url}\n   ${b.url}${tags}`);
     }
 
     if (Number(count) > MAX_SEARCH_RESULTS) {
@@ -110,64 +100,3 @@ export async function handleSearchCommand(
   }
 }
 
-export async function handleReplyCommand(
-  sock: WASocket,
-  remoteJid: string,
-  command: string,
-  quotedStanzaId: string,
-  msg: any,
-): Promise<void> {
-  try {
-    const [bookmark] = await db
-      .select()
-      .from(bookmarks)
-      .where(eq(bookmarks.whatsappMessageId, quotedStanzaId))
-      .limit(1);
-
-    if (bookmark) {
-      let replyText = "";
-      if (command === "delete") {
-        await db.delete(bookmarks).where(eq(bookmarks.id, bookmark.id));
-        replyText = "🗑️ deleted";
-      } else if (command === "archive") {
-        await db.update(bookmarks).set({ isArchived: true, updatedAt: new Date() }).where(eq(bookmarks.id, bookmark.id));
-        replyText = "📦 archived";
-      } else if (command === "fav" || command === "favorite") {
-        await db.update(bookmarks).set({ isFavorite: true, updatedAt: new Date() }).where(eq(bookmarks.id, bookmark.id));
-        replyText = "⭐ favorited";
-      } else if (command === "unfav") {
-        await db.update(bookmarks).set({ isFavorite: false, updatedAt: new Date() }).where(eq(bookmarks.id, bookmark.id));
-        replyText = "☆ unfavorited";
-      }
-
-      if (replyText) {
-        await sock.sendMessage(remoteJid, { text: replyText }, { quoted: msg });
-      }
-      logger.info("Reply command processed", { command, bookmarkId: bookmark.id });
-    } else {
-      await sock.sendMessage(remoteJid, { text: "⚠️ bookmark not found for that message" }, { quoted: msg });
-    }
-  } catch (error) {
-    logger.error("Reply command failed", { command, error });
-  }
-}
-
-export const HELP_TEXT = `*Bookmark Bot Commands:*
-
-*Save a bookmark:* Send any URL
-  • Add tags: include #tag1 #tag2
-  • Mark favorite: add !fav or ⭐
-
-*Search:*
-  • search <query> — text search
-  • search #tag — filter by tag
-  • search fav — list favorites
-  • search recent — latest bookmarks
-  • ?<query> — quick search
-    e.g. ?nykaa, ?react tutorials
-
-*Reply commands:* (reply to a saved bookmark)
-  • delete — remove bookmark
-  • archive — archive it
-  • fav — mark favorite
-  • unfav — remove favorite`;

@@ -22,9 +22,7 @@ export const bookmarks = sqliteTable(
     isArchived: integer("is_archived", { mode: "boolean" })
       .notNull()
       .default(false),
-    isFavorite: integer("is_favorite", { mode: "boolean" })
-      .notNull()
-      .default(false),
+
     isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -40,7 +38,7 @@ export const bookmarks = sqliteTable(
   (table) => ({
     createdAtIdx: index("idx_bookmarks_created_at").on(table.createdAt),
     domainIdx: index("idx_bookmarks_domain").on(table.domain),
-    favoriteIdx: index("idx_bookmarks_favorite").on(table.isFavorite),
+
     archivedIdx: index("idx_bookmarks_archived").on(table.isArchived),
   }),
 );

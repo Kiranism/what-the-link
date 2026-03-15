@@ -14,7 +14,7 @@ bookmarksRouter.get("/", async (c) => {
   const search = c.req.query("search");
   const tag = c.req.query("tag");
   const domain = c.req.query("domain");
-  const favorite = c.req.query("favorite") === "true";
+
   const unread = c.req.query("unread") === "true";
   const archived = c.req.query("archived") === "true";
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
@@ -52,9 +52,6 @@ bookmarksRouter.get("/", async (c) => {
     conditions.push(eq(bookmarks.domain, domain.trim()));
   }
 
-  if (favorite) {
-    conditions.push(eq(bookmarks.isFavorite, true));
-  }
 
   if (unread) {
     conditions.push(eq(bookmarks.isRead, false));
@@ -124,12 +121,7 @@ bookmarksRouter.post("/bulk", async (c) => {
     case "unarchive":
       await db.update(bookmarks).set({ isArchived: false, updatedAt: now }).where(inArray(bookmarks.id, ids));
       break;
-    case "favorite":
-      await db.update(bookmarks).set({ isFavorite: true, updatedAt: now }).where(inArray(bookmarks.id, ids));
-      break;
-    case "unfavorite":
-      await db.update(bookmarks).set({ isFavorite: false, updatedAt: now }).where(inArray(bookmarks.id, ids));
-      break;
+
     case "markRead":
       await db.update(bookmarks).set({ isRead: true, updatedAt: now }).where(inArray(bookmarks.id, ids));
       break;
@@ -225,7 +217,7 @@ bookmarksRouter.patch("/:id", async (c) => {
     "title",
     "description",
     "tags",
-    "isFavorite",
+
     "isArchived",
     "isRead",
   ];

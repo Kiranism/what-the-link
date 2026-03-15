@@ -15,29 +15,16 @@ const commands = [
     examples: [
       "https://example.com",
       "https://example.com #design #inspiration",
-      "https://example.com !fav",
     ],
   },
   {
     label: "Search bookmarks",
-    description: "Find saved bookmarks by text, tag, or status",
+    description: "Start with ? to search",
     examples: [
-      "search react hooks",
-      "search #tutorial",
-      "search fav",
-      "search recent",
       "?react tutorials",
+      "?#design",
+      "?recent",
     ],
-  },
-  {
-    label: "Reply commands",
-    description: "Reply to a saved bookmark message with:",
-    examples: ["delete", "archive", "fav", "unfav"],
-  },
-  {
-    label: "Help",
-    description: "Show available commands",
-    examples: ["help", "/help"],
   },
 ];
 

@@ -8,7 +8,7 @@ export interface Bookmark {
   domain: string;
   tags: string[];
   isArchived: boolean;
-  isFavorite: boolean;
+
   isRead: boolean;
   createdAt: Date;
   updatedAt: Date;

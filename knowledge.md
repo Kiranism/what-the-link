@@ -246,10 +246,9 @@ The server bundle includes all `@bookmark/*` packages (db, env, types) — no ex
 **Commands (in WhatsApp):**
 - Send any URL → saves as bookmark
 - `#tag1 #tag2` with URL → adds tags
-- `!fav` or ⭐ with URL → marks as favorite
-- `search <query>` → searches bookmarks
-- `?<query>` → quick search
-- Reply to saved bookmark with `delete`, `archive`, `fav`, `unfav`
-- `/help` → shows all commands
+
+- `?<query>` → searches bookmarks
+
+
 
 **Important:** WhatsApp session persists in `/data/whatsapp_auth`. If this directory is lost, you'll need to re-scan the QR code.
