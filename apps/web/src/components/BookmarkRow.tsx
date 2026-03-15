@@ -74,7 +74,7 @@ export const BookmarkRow = memo(function BookmarkRow({
             </span>
           </div>
 
-          <div className="relative flex items-center shrink-0">
+          <div className="relative flex items-center shrink-0 min-w-[5.75rem] justify-end">
             <span
               className={`text-muted-foreground text-xs whitespace-nowrap transition-opacity group-hover/row:opacity-0 group-focus-within/row:opacity-0 ${isFocused ? "opacity-0" : ""}`}
             >
