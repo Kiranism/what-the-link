@@ -9,7 +9,7 @@ services:
       - NODE_ENV=production
       - WA_AUTH_DIR=/data/whatsapp_auth
     volumes:
-      - app_data:/data
+      - ./data:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
@@ -17,6 +17,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-
-volumes:
-  app_data:

@@ -49,7 +49,7 @@ COPY --from=builder /app/packages/types ./packages/types
 COPY --from=builder /app/packages/ui ./packages/ui
 COPY --from=builder /app/packages/config ./packages/config
 
-RUN mkdir -p /app/data/whatsapp_auth
+RUN mkdir -p /data/whatsapp_auth
 
 COPY entrypoint.sh ./
 RUN chmod +x entrypoint.sh

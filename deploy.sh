@@ -14,6 +14,9 @@ elif ! grep -q "APP_PASSWORD" .env; then
   echo "Added APP_PASSWORD to .env."
 fi
 
+# Ensure data directory exists on host
+mkdir -p ./data
+
 echo "Pulling latest changes..."
 git pull
 
