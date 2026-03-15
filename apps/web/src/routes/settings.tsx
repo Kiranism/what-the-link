@@ -10,7 +10,7 @@ import {
 } from "@bookmark/ui/components/card";
 import { WhatsAppConnectionSettings } from "../components/settings/WhatsAppConnectionSettings";
 import { WhatsAppGroupSettings } from "../components/settings/WhatsAppGroupSettings";
-import { ExportImportSettings } from "../components/settings/ExportImportSettings";
+import { WhatsAppCommandsInfo } from "../components/settings/WhatsAppCommandsInfo";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -37,7 +37,7 @@ function SettingsPage() {
         <WhatsAppConnectionSettings />
         <WhatsAppGroupSettings />
       </div>
-      <ExportImportSettings />
+      <WhatsAppCommandsInfo />
     </div>
   );
 }

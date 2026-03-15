@@ -127,31 +127,6 @@ export async function bulkUpdateBookmarks(
   return res.json();
 }
 
-export async function exportBookmarks(format: "json" | "html" = "json"): Promise<void> {
-  const res = await fetch(`${API_BASE}/bookmarks/export?format=${format}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to export bookmarks");
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = format === "html" ? "bookmarks.html" : "bookmarks.json";
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-export async function importBookmarks(
-  data: { bookmarks: Array<{ url: string; title?: string; description?: string; tags?: string[] }> },
-): Promise<{ success: boolean; imported: number; skipped: number }> {
-  const res = await fetch(`${API_BASE}/bookmarks/import`, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Failed to import bookmarks");
-  return res.json();
-}
 
 export async function refreshBookmarkMetadata(id: number): Promise<Bookmark> {
   const res = await fetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
