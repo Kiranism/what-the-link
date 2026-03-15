@@ -1,14 +1,21 @@
 # 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)\_/¯
 
-Self-hosted, single-user bookmark manager that saves links sent via WhatsApp, fetches metadata, and provides a web UI for searching and organizing bookmarks.
+## Why another bookmarking tool?
+
+Have you ever used WhatsApp as your personal bookmarking tool? I did. I'd send myself links — articles, products, posts — right in a private group chat. But finding them later? A nightmare. Endless scrolling, lost links, no way to search.
+
+That's why I built **What The Link**. It's a self-hosted bookmarking tool that plugs directly into WhatsApp. Scan the QR, link your group, and every link you send is automatically saved with metadata, organized, and searchable. Tag links with hashtags right in the chat. Ask later — *"show me all GitHub bookmarks"* — and they appear instantly.
+
+No more scrolling. No more lost links. Just your bookmarks, right where you want them.
 
 ## Features
 
-- **WhatsApp integration** — Send a link in any chat; it's saved automatically (via Baileys)
-- **Metadata** — Title, description, and image from Open Graph
+- **WhatsApp integration** — Send a link in your chat; it's saved automatically
+- **Metadata** — Title, description, and image fetched from Open Graph
+- **Tagging** — Add `#hashtags` alongside your links to organize them
 - **Web UI** — Search, filter by tags/domain, keyboard shortcuts
 - **Single user** — Password-protected; no OAuth
-- **Self-hosted** — Runs on any VPS with Docker (Oracle Cloud free tier works great)
+- **Self-hosted** — Runs on any VPS with Docker
 
 ## Tech Stack
 
