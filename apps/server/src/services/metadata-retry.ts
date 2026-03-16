@@ -45,6 +45,15 @@ async function retryFailedMetadata(): Promise<void> {
           })
           .where(eq(bookmarks.id, bookmark.id));
 
+        // If summary was failed/skipped, reset to pending so the summary
+        // retry job can re-process with the newly fetched metadata
+        if (bookmark.summaryStatus !== "complete") {
+          await db
+            .update(bookmarks)
+            .set({ summaryStatus: "pending", summaryRetries: 0 })
+            .where(eq(bookmarks.id, bookmark.id));
+        }
+
         logger.info("Metadata retry succeeded", {
           url: bookmark.url,
           title: metadata.title,

@@ -151,6 +151,14 @@ export async function getImportStatus(): Promise<ImportStatusResponse> {
   return res.json();
 }
 
+export async function retryAiEnrichment(): Promise<{ reset: number }> {
+  const res = await authFetch(`${API_BASE}/bookmarks/retry-ai`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to retry AI enrichment");
+  return res.json();
+}
+
 export async function dismissImportStatus(): Promise<void> {
   const res = await authFetch(`${API_BASE}/bookmarks/import/status`, {
     method: "DELETE",

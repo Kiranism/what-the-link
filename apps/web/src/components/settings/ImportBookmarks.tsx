@@ -22,6 +22,7 @@ import {
   importBookmarks,
   getImportStatus,
   dismissImportStatus,
+  retryAiEnrichment,
   type ImportResult,
 } from "../../utils/api";
 
@@ -51,7 +52,20 @@ export function ImportBookmarks() {
   const pendingCount = enrichment.pending ?? 0;
   const completeCount = enrichment.complete ?? 0;
   const failedCount = enrichment.failed ?? 0;
-  const totalEnrichable = pendingCount + completeCount + failedCount;
+  const skippedCount = enrichment.skipped ?? 0;
+  const stuckCount = failedCount + skippedCount;
+  const totalEnrichable = pendingCount + completeCount + failedCount + skippedCount;
+
+  const retryMutation = useMutation({
+    mutationFn: retryAiEnrichment,
+    onSuccess: (data) => {
+      toast.success(`Reset ${data.reset} bookmarks for AI processing`);
+      queryClient.invalidateQueries({ queryKey: ["import-status"] });
+    },
+    onError: () => {
+      toast.error("Failed to retry AI enrichment");
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: (file: File) => importBookmarks(file),
@@ -274,10 +288,21 @@ export function ImportBookmarks() {
                 Processing ~10 every 5 minutes in the background.
               </p>
             )}
-            {failedCount > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {failedCount} failed (will retry up to 3 times).
-              </p>
+            {stuckCount > 0 && (
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  {stuckCount} failed/skipped
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => retryMutation.mutate()}
+                  disabled={retryMutation.isPending}
+                  className="h-7 text-xs"
+                >
+                  {retryMutation.isPending ? "Retrying..." : "Retry all"}
+                </Button>
+              </div>
             )}
           </div>
         )}

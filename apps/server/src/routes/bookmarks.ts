@@ -198,6 +198,29 @@ bookmarksRouter.get("/import/status", async (c) => {
   });
 });
 
+bookmarksRouter.post("/retry-ai", async (c) => {
+  // Reset all stuck bookmarks (failed with max retries) so the background job retries them
+  const result = await db
+    .update(bookmarks)
+    .set({
+      summaryStatus: "pending",
+      summaryRetries: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        or(
+          eq(bookmarks.summaryStatus, "failed"),
+          eq(bookmarks.summaryStatus, "skipped"),
+        ),
+      ),
+    )
+    .returning({ id: bookmarks.id });
+
+  logger.info("Reset stuck bookmarks for AI retry", { count: result.length });
+  return c.json({ reset: result.length });
+});
+
 bookmarksRouter.delete("/import/status", async (c) => {
   clearImportStatus();
   return c.json({ success: true });
