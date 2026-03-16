@@ -1,6 +1,6 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
-import { and, eq, lt, or } from "drizzle-orm";
+import { and, eq, lt, or, sql } from "drizzle-orm";
 import { isAIConfigured } from "./ai-client";
 import {
   generateEmbedding,
@@ -11,29 +11,21 @@ import { setEmbeddingCacheEntry } from "./embedding-cache";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
-// OpenRouter has no strict rate limit — process aggressively for fast catch-up
 const BATCH_SIZE = 50;
-const RETRY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+// Fallback interval — only matters if processAllPendingEmbeddings wasn't triggered
+const RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let rateLimitedUntil = 0;
+let processing = false;
 
 function isRateLimitError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return msg.includes("429") || msg.includes("Too Many Requests") || msg.includes("quota");
 }
 
-async function retryFailedEmbeddings(): Promise<void> {
-  if (!isAIConfigured()) return;
-
-  if (Date.now() < rateLimitedUntil) {
-    logger.info("Embedding retry skipped — rate limited", {
-      resumeIn: `${Math.ceil((rateLimitedUntil - Date.now()) / 1000)}s`,
-    });
-    return;
-  }
-
-  const pendingBookmarks = await db
+async function getPendingBatch() {
+  return db
     .select({
       id: bookmarks.id,
       url: bookmarks.url,
@@ -55,106 +47,143 @@ async function retryFailedEmbeddings(): Promise<void> {
       ),
     )
     .limit(BATCH_SIZE);
+}
 
-  if (pendingBookmarks.length === 0) return;
+/**
+ * Process ALL pending embeddings in a loop until none remain.
+ * Stops on rate limit, resumes on next call.
+ */
+export async function processAllPendingEmbeddings(): Promise<void> {
+  if (!isAIConfigured()) return;
+  if (processing) {
+    logger.info("Embedding processing already running, skipping");
+    return;
+  }
 
-  logger.info("Retrying embeddings for bookmarks", {
-    count: pendingBookmarks.length,
-  });
+  processing = true;
+  let totalProcessed = 0;
 
-  for (const bookmark of pendingBookmarks) {
-    // Check rate limit before each item
-    if (Date.now() < rateLimitedUntil) {
-      logger.info("Stopping embedding batch — rate limited", {
-        resumeIn: `${Math.ceil((rateLimitedUntil - Date.now()) / 1000)}s`,
-      });
-      break;
-    }
+  try {
+    const [countResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(bookmarks)
+      .where(
+        and(
+          or(
+            eq(bookmarks.embeddingStatus, "pending"),
+            eq(bookmarks.embeddingStatus, "failed"),
+          ),
+          lt(bookmarks.embeddingRetries, MAX_RETRIES),
+        ),
+      );
+    const totalPending = countResult?.count ?? 0;
 
-    try {
-      const text = buildEmbeddingText(bookmark);
-      const embedding = await generateEmbedding(text);
+    if (totalPending === 0) return;
 
-      if (embedding) {
-        const blob = serializeEmbedding(embedding);
-        await db
-          .update(bookmarks)
-          .set({
-            embedding: blob,
-            embeddingStatus: "complete",
-            embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(bookmarks.id, bookmark.id));
+    logger.info("Processing all pending embeddings", { totalPending });
 
-        setEmbeddingCacheEntry(bookmark.id, embedding, bookmark.isArchived);
-
-        logger.info("Embedding generated", { id: bookmark.id, url: bookmark.url });
-      } else {
-        await db
-          .update(bookmarks)
-          .set({
-            embeddingStatus: "failed",
-            embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(bookmarks.id, bookmark.id));
-
-        logger.warn("Embedding generation returned null", {
-          id: bookmark.id,
-          url: bookmark.url,
+    while (true) {
+      if (Date.now() < rateLimitedUntil) {
+        logger.info("Embedding processing paused — rate limited", {
+          processed: totalProcessed,
+          resumeIn: `${Math.ceil((rateLimitedUntil - Date.now()) / 1000)}s`,
         });
-      }
-    } catch (error) {
-      if (isRateLimitError(error)) {
-        rateLimitedUntil = Date.now() + 60_000;
-        logger.warn("Rate limited on embeddings, pausing batch");
         break;
       }
 
-      logger.error("Embedding failed for bookmark", {
-        id: bookmark.id,
-        url: bookmark.url,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const batch = await getPendingBatch();
+      if (batch.length === 0) break;
 
-      try {
-        await db
-          .update(bookmarks)
-          .set({
-            embeddingStatus: "failed",
-            embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
-            updatedAt: new Date(),
-          })
-          .where(eq(bookmarks.id, bookmark.id));
-      } catch {
-        // best effort
+      for (const bookmark of batch) {
+        if (Date.now() < rateLimitedUntil) break;
+
+        try {
+          const text = buildEmbeddingText(bookmark);
+          const embedding = await generateEmbedding(text);
+
+          if (embedding) {
+            const blob = serializeEmbedding(embedding);
+            await db
+              .update(bookmarks)
+              .set({
+                embedding: blob,
+                embeddingStatus: "complete",
+                embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
+                updatedAt: new Date(),
+              })
+              .where(eq(bookmarks.id, bookmark.id));
+
+            setEmbeddingCacheEntry(bookmark.id, embedding, bookmark.isArchived);
+            totalProcessed++;
+
+            logger.info("Embedding generated", { id: bookmark.id, url: bookmark.url });
+          } else {
+            await db
+              .update(bookmarks)
+              .set({
+                embeddingStatus: "failed",
+                embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
+                updatedAt: new Date(),
+              })
+              .where(eq(bookmarks.id, bookmark.id));
+
+            logger.warn("Embedding returned null", { id: bookmark.id, url: bookmark.url });
+          }
+        } catch (error) {
+          if (isRateLimitError(error)) {
+            rateLimitedUntil = Date.now() + 60_000;
+            logger.warn("Rate limited on embeddings, pausing");
+            break;
+          }
+
+          logger.error("Embedding failed", {
+            id: bookmark.id,
+            url: bookmark.url,
+            error: error instanceof Error ? error.message : String(error),
+          });
+
+          try {
+            await db
+              .update(bookmarks)
+              .set({
+                embeddingStatus: "failed",
+                embeddingRetries: (bookmark.embeddingRetries ?? 0) + 1,
+                updatedAt: new Date(),
+              })
+              .where(eq(bookmarks.id, bookmark.id));
+          } catch {
+            // best effort
+          }
+        }
       }
     }
+
+    if (totalProcessed > 0) {
+      logger.info("Embedding processing complete", { totalProcessed });
+    }
+  } finally {
+    processing = false;
   }
 }
 
 export function startEmbeddingRetryJob(): void {
+  // Fallback interval for any stragglers/failures
   intervalId = setInterval(() => {
-    retryFailedEmbeddings().catch((err) => {
+    processAllPendingEmbeddings().catch((err) => {
       logger.error("Embedding retry job failed", {
         error: err instanceof Error ? err.message : String(err),
       });
     });
   }, RETRY_INTERVAL_MS);
 
-  // Run once immediately on startup to process any pending embeddings
-  retryFailedEmbeddings().catch((err) => {
-    logger.error("Initial embedding retry failed", {
+  // Process everything immediately on startup
+  processAllPendingEmbeddings().catch((err) => {
+    logger.error("Initial embedding processing failed", {
       error: err instanceof Error ? err.message : String(err),
     });
   });
 
-  logger.info("Embedding retry job started", {
-    intervalMs: RETRY_INTERVAL_MS,
-    batchSize: BATCH_SIZE,
-    maxRetries: MAX_RETRIES,
-  });
+  logger.info("Embedding retry job started", { intervalMs: RETRY_INTERVAL_MS });
 }
 
 export function stopEmbeddingRetryJob(): void {

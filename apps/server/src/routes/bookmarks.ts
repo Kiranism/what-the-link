@@ -10,6 +10,8 @@ import { smartSearch } from "../services/smart-search";
 import { removeEmbeddingCacheEntry, updateEmbeddingCacheArchived, setEmbeddingCacheEntry } from "../services/embedding-cache";
 import { generateEmbedding, buildEmbeddingText, serializeEmbedding } from "../services/embedding-service";
 import { parseBookmarkHtml, importBookmarks, getImportStatus, clearImportStatus } from "../services/bookmark-import";
+import { processAllPendingSummaries } from "../services/summary-retry";
+import { processAllPendingEmbeddings } from "../services/embedding-retry";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { logger } from "../utils/logger";
@@ -264,7 +266,19 @@ bookmarksRouter.post("/retry-ai", async (c) => {
     )
     .returning({ id: bookmarks.id });
 
-  logger.info("Reset stuck bookmarks for AI retry", { count: result.length });
+  logger.info("Reset bookmarks for AI retry", { count: result.length });
+
+  // Trigger immediate processing
+  if (result.length > 0) {
+    processAllPendingSummaries()
+      .then(() => processAllPendingEmbeddings())
+      .catch((err) => {
+        logger.error("Post-retry AI processing failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }
+
   return c.json({ reset: result.length });
 });
 
@@ -286,7 +300,17 @@ bookmarksRouter.post("/retry-embeddings", async (c) => {
     )
     .returning({ id: bookmarks.id });
 
-  logger.info("Reset stuck bookmarks for embedding retry", { count: result.length });
+  logger.info("Reset bookmarks for embedding retry", { count: result.length });
+
+  // Trigger immediate processing
+  if (result.length > 0) {
+    processAllPendingEmbeddings().catch((err) => {
+      logger.error("Post-retry embedding processing failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }
+
   return c.json({ reset: result.length });
 });
 

@@ -3,6 +3,8 @@ import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { eq } from "drizzle-orm";
 import { isAIConfigured } from "./ai-client";
+import { processAllPendingSummaries } from "./summary-retry";
+import { processAllPendingEmbeddings } from "./embedding-retry";
 import { logger } from "../utils/logger";
 
 interface ParsedBookmark {
@@ -177,6 +179,18 @@ export async function importBookmarks(
     completedAt: Date.now(),
     startedAt: currentImport.startedAt,
   };
+
+  // Fire-and-forget: immediately start processing all pending AI enrichment
+  if (result.imported > 0) {
+    logger.info("Import done, triggering AI enrichment", { imported: result.imported });
+    processAllPendingSummaries()
+      .then(() => processAllPendingEmbeddings())
+      .catch((err) => {
+        logger.error("Post-import AI enrichment failed", {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }
 
   return result;
 }
