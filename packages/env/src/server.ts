@@ -24,6 +24,8 @@ export const env = createEnv({
     WA_AUTH_DIR: z.string().optional(),
     /** When set, only save bookmarks from this WhatsApp group (use group JID, e.g. 120363123456789012@g.us). Leave unset to allow all chats. */
     WA_ALLOWED_GROUP_JID: z.string().optional(),
+    /** Google Gemini API key for AI-powered link extraction from text and images. */
+    GEMINI_API_KEY: z.string().optional(),
   },
   runtimeEnv: {
     ...process.env,

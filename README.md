@@ -47,7 +47,23 @@ npm run dev
 
 Open the web app, enter your password, go to **Settings**, scan the QR with WhatsApp, and start sending links.
 
-## Deploy (Docker)
+## Deploy
+
+### One-click (Railway)
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2FKiranism%2Fwhat-the-link&envs=APP_PASSWORD&APP_PASSWORDDesc=Password+for+the+web+UI)
+
+> After deploying, add a **volume** mounted at `/data` in the Railway dashboard for persistent storage (database + WhatsApp session).
+
+### One-command install (VPS)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Kiranism/what-the-link/main/install.sh | bash
+```
+
+Installs Docker if needed, prompts for your password, builds and starts the app.
+
+### Docker Compose (manual)
 
 ```bash
 git clone https://github.com/Kiranism/what-the-link.git
@@ -73,7 +89,9 @@ See [how-to-deploy.md](how-to-deploy.md) for the full guide — domain setup, HT
 ## API
 
 - `GET /health` — Health check (no auth)
-- `GET /api/whatsapp/qr` — QR code for WhatsApp linking (no auth)
+- `POST /api/login` — Login (sets httpOnly session cookie)
+- `POST /api/logout` — Logout (clears session cookie)
+- `GET /api/whatsapp/qr` — QR code for WhatsApp linking
 - `GET /api/whatsapp/status` — Connection status
 - `GET /api/bookmarks` — List (query: `search`, `tag`, `domain`, `archived`, `limit`, `offset`)
 - `GET /api/bookmarks/export?format=json|html` — Export bookmarks
@@ -82,7 +100,7 @@ See [how-to-deploy.md](how-to-deploy.md) for the full guide — domain setup, HT
 - `PATCH /api/bookmarks/:id` — Update
 - `DELETE /api/bookmarks/:id` — Delete
 
-All `/api/bookmarks/*` and `/api/settings/*` endpoints require `Authorization: Bearer <APP_PASSWORD>`.
+All endpoints except `/health` and `/api/login` require authentication (httpOnly session cookie or `Authorization: Bearer <APP_PASSWORD>`).
 
 ## Project Structure
 
