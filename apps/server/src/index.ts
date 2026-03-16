@@ -11,9 +11,6 @@ async function ensureNewColumns(): Promise<void> {
   const cols = [
     { name: "metadata_status", sql: "ALTER TABLE bookmarks ADD COLUMN metadata_status TEXT NOT NULL DEFAULT 'complete'" },
     { name: "metadata_retries", sql: "ALTER TABLE bookmarks ADD COLUMN metadata_retries INTEGER NOT NULL DEFAULT 0" },
-    { name: "summary", sql: "ALTER TABLE bookmarks ADD COLUMN summary TEXT" },
-    { name: "summary_status", sql: "ALTER TABLE bookmarks ADD COLUMN summary_status TEXT NOT NULL DEFAULT 'skipped'" },
-    { name: "summary_retries", sql: "ALTER TABLE bookmarks ADD COLUMN summary_retries INTEGER NOT NULL DEFAULT 0" },
   ];
   for (const col of cols) {
     try {
@@ -68,8 +65,8 @@ async function main() {
     logger.info("Database migrations complete");
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("already exists")) {
-      logger.warn("Migration skipped (tables already exist), applying column updates...");
+    if (msg.includes("already exists") || msg.includes("duplicate column")) {
+      logger.warn("Migration skipped (tables/columns already exist), applying column updates...");
     } else {
       throw e;
     }
