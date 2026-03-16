@@ -5,11 +5,25 @@ import { fetchMetadata } from "./metadata";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
-const RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const BATCH_SIZE = 3;
+const RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
+let rateLimitedUntil = 0;
+
+function isRateLimitError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes("429") || msg.includes("Too Many Requests") || msg.includes("quota");
+}
 
 async function retryFailedMetadata(): Promise<void> {
+  if (Date.now() < rateLimitedUntil) {
+    logger.info("Metadata retry skipped — rate limited", {
+      resumeIn: `${Math.ceil((rateLimitedUntil - Date.now()) / 1000)}s`,
+    });
+    return;
+  }
+
   const failedBookmarks = await db
     .select()
     .from(bookmarks)
@@ -19,7 +33,7 @@ async function retryFailedMetadata(): Promise<void> {
         lt(bookmarks.metadataRetries, MAX_RETRIES),
       ),
     )
-    .limit(10);
+    .limit(BATCH_SIZE);
 
   if (failedBookmarks.length === 0) return;
 
@@ -28,6 +42,11 @@ async function retryFailedMetadata(): Promise<void> {
   });
 
   for (const bookmark of failedBookmarks) {
+    if (Date.now() < rateLimitedUntil) {
+      logger.info("Stopping metadata batch — rate limited");
+      break;
+    }
+
     try {
       const metadata = await fetchMetadata(bookmark.url);
 
@@ -73,6 +92,14 @@ async function retryFailedMetadata(): Promise<void> {
         });
       }
     } catch (error) {
+      if (isRateLimitError(error)) {
+        rateLimitedUntil = Date.now() + 60_000;
+        logger.warn("Rate limited on metadata fetch, pausing batch", {
+          url: bookmark.url,
+        });
+        break;
+      }
+
       logger.error("Metadata retry error", {
         url: bookmark.url,
         error: error instanceof Error ? error.message : String(error),
@@ -92,6 +119,7 @@ export function startMetadataRetryJob(): void {
 
   logger.info("Metadata retry job started", {
     intervalMs: RETRY_INTERVAL_MS,
+    batchSize: BATCH_SIZE,
     maxRetries: MAX_RETRIES,
   });
 }
