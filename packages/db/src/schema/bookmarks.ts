@@ -34,6 +34,9 @@ export const bookmarks = sqliteTable(
     whatsappMessageId: text("whatsapp_message_id"),
     metadataStatus: text("metadata_status").notNull().default("complete"),
     metadataRetries: integer("metadata_retries").notNull().default(0),
+    summary: text("summary"),
+    summaryStatus: text("summary_status").notNull().default("skipped"),
+    summaryRetries: integer("summary_retries").notNull().default(0),
   },
   (table) => ({
     createdAtIdx: index("idx_bookmarks_created_at").on(table.createdAt),

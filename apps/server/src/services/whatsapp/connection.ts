@@ -10,6 +10,8 @@ import {
   extractLinksFromImage,
   isGeminiConfigured,
 } from "../gemini-link-extractor";
+import { generateSummary } from "../gemini-summarizer";
+import { generateTags } from "../gemini-tagger";
 import { env } from "@bookmark/env/server";
 import {
   makeWASocket,
@@ -317,7 +319,9 @@ export async function initWhatsApp(): Promise<void> {
 
           const metadata = await fetchMetadata(url);
 
-          await db.insert(bookmarks).values({
+          const geminiReady = isGeminiConfigured();
+
+          const [inserted] = await db.insert(bookmarks).values({
             url,
             title: metadata.title ?? url,
             description: metadata.description ?? null,
@@ -328,10 +332,59 @@ export async function initWhatsApp(): Promise<void> {
             source: "whatsapp",
             whatsappMessageId: msg.key.id,
             metadataStatus: metadata.success ? "complete" : "failed",
-          });
+            summaryStatus: geminiReady ? "pending" : "skipped",
+          }).returning();
 
           logger.info("Bookmark saved", { url, title: metadata.title, tags, source });
           savedCount++;
+
+          // Fire-and-forget: generate AI summary + auto-tags
+          if (geminiReady && inserted) {
+            const metaTitle = metadata.title ?? null;
+            const metaDesc = metadata.description ?? null;
+
+            generateSummary(url, metaTitle, metaDesc)
+              .then(async (summary) => {
+                if (summary) {
+                  await db
+                    .update(bookmarks)
+                    .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
+                    .where(eq(bookmarks.id, inserted.id));
+                  logger.info("Summary generated", { url });
+                } else {
+                  await db
+                    .update(bookmarks)
+                    .set({ summaryStatus: "failed", updatedAt: new Date() })
+                    .where(eq(bookmarks.id, inserted.id));
+                }
+              })
+              .catch((err) => {
+                logger.error("Summary generation error", {
+                  url,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              });
+
+            // Auto-tag when no user-provided tags
+            if (tags.length === 0) {
+              generateTags(url, metaTitle, metaDesc)
+                .then(async (aiTags) => {
+                  if (aiTags.length > 0) {
+                    await db
+                      .update(bookmarks)
+                      .set({ tags: aiTags, updatedAt: new Date() })
+                      .where(eq(bookmarks.id, inserted.id));
+                    logger.info("Auto-tags generated", { url, tags: aiTags });
+                  }
+                })
+                .catch((err) => {
+                  logger.error("Auto-tagging error", {
+                    url,
+                    error: err instanceof Error ? err.message : String(err),
+                  });
+                });
+            }
+          }
         } catch (error) {
           logger.error("Failed to save bookmark", { url, error });
         }

@@ -3,8 +3,13 @@ import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db, dbClient } from "@bookmark/db";
 import { fetchMetadata } from "../services/metadata";
 import { normalizeUrl } from "../utils/url-extractor";
+import { generateSummary } from "../services/gemini-summarizer";
+import { generateTags } from "../services/gemini-tagger";
+import { isGeminiConfigured } from "../services/gemini-client";
+import { smartSearch } from "../services/smart-search";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
+import { logger } from "../utils/logger";
 
 export const bookmarksRouter = new Hono();
 
@@ -20,6 +25,43 @@ bookmarksRouter.get("/", async (c) => {
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
   const offset = Number(c.req.query("offset")) || 0;
 
+  // Try smart search when search param exists and Gemini is configured
+  if (search?.trim() && isGeminiConfigured()) {
+    try {
+      const { orderedIds, searchMode } = await smartSearch(search.trim(), { archived });
+
+      if (searchMode === "smart" && orderedIds.length > 0) {
+        // Fetch the bookmarks in the reranked order
+        const paginatedIds = orderedIds.slice(offset, offset + limit);
+        if (paginatedIds.length === 0) {
+          return c.json({ bookmarks: [], total: orderedIds.length, limit, offset, searchMode });
+        }
+
+        const results = await db
+          .select()
+          .from(bookmarks)
+          .where(inArray(bookmarks.id, paginatedIds));
+
+        // Sort results to match the reranked order
+        const idOrderMap = new Map(paginatedIds.map((id, i) => [id, i]));
+        results.sort((a, b) => (idOrderMap.get(a.id) ?? 0) - (idOrderMap.get(b.id) ?? 0));
+
+        return c.json({
+          bookmarks: results,
+          total: orderedIds.length,
+          limit,
+          offset,
+          searchMode,
+        });
+      }
+      // If smart search returned no results or fell back to basic, continue with LIKE below
+    } catch (error) {
+      logger.error("Smart search failed, falling back to basic search", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const conditions = [eq(bookmarks.isArchived, archived)];
 
   if (search?.trim()) {
@@ -29,6 +71,7 @@ bookmarksRouter.get("/", async (c) => {
         like(bookmarks.title, term),
         like(bookmarks.description, term),
         like(bookmarks.url, term),
+        like(bookmarks.summary, term),
       )!,
     );
   }
@@ -67,16 +110,18 @@ bookmarksRouter.get("/", async (c) => {
     .limit(limit)
     .offset(offset);
 
-  const [{ count }] = await db
+  const countResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(bookmarks)
     .where(whereClause);
+  const count = countResult[0]?.count ?? 0;
 
   return c.json({
     bookmarks: results,
     total: count,
     limit,
     offset,
+    searchMode: "basic" as const,
   });
 });
 
@@ -170,6 +215,7 @@ bookmarksRouter.post("/", async (c) => {
   }
 
   const domain = new URL(url).hostname;
+  const geminiReady = isGeminiConfigured();
 
   const [created] = await db
     .insert(bookmarks)
@@ -182,8 +228,56 @@ bookmarksRouter.post("/", async (c) => {
       domain,
       tags: Array.isArray(body.tags) ? body.tags : [],
       source: "manual",
+      summaryStatus: geminiReady ? "pending" : "skipped",
     })
     .returning();
+
+  // Fire-and-forget: generate AI summary + auto-tags
+  if (geminiReady && created) {
+    const metaTitle = body.title ?? null;
+    const metaDesc = body.description ?? null;
+
+    generateSummary(url, metaTitle, metaDesc)
+      .then(async (summary) => {
+        if (summary) {
+          await db
+            .update(bookmarks)
+            .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
+            .where(eq(bookmarks.id, created.id));
+        } else {
+          await db
+            .update(bookmarks)
+            .set({ summaryStatus: "failed", updatedAt: new Date() })
+            .where(eq(bookmarks.id, created.id));
+        }
+      })
+      .catch((err) => {
+        logger.error("Summary generation error on create", {
+          url,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+    // Auto-tag when no user-provided tags
+    const userTags = Array.isArray(body.tags) ? body.tags : [];
+    if (userTags.length === 0) {
+      generateTags(url, metaTitle, metaDesc)
+        .then(async (aiTags) => {
+          if (aiTags.length > 0) {
+            await db
+              .update(bookmarks)
+              .set({ tags: aiTags, updatedAt: new Date() })
+              .where(eq(bookmarks.id, created.id));
+          }
+        })
+        .catch((err) => {
+          logger.error("Auto-tagging error on create", {
+            url,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    }
+  }
 
   return c.json(created!, 201);
 });
@@ -258,6 +352,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
   }
 
   const metadata = await fetchMetadata(bookmark.url);
+  const geminiReady = isGeminiConfigured();
 
   const [updated] = await db
     .update(bookmarks)
@@ -267,10 +362,39 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
       image: metadata.image ?? bookmark.image,
       favicon: metadata.favicon ?? bookmark.favicon,
       metadataStatus: metadata.success ? "complete" : "failed",
+      summaryStatus: geminiReady ? "pending" : bookmark.summaryStatus,
       updatedAt: new Date(),
     })
     .where(eq(bookmarks.id, id))
     .returning();
+
+  // Fire-and-forget: regenerate AI summary
+  if (geminiReady && updated) {
+    generateSummary(
+      bookmark.url,
+      metadata.title ?? bookmark.title,
+      metadata.description ?? bookmark.description,
+    )
+      .then(async (summary) => {
+        if (summary) {
+          await db
+            .update(bookmarks)
+            .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
+            .where(eq(bookmarks.id, id));
+        } else {
+          await db
+            .update(bookmarks)
+            .set({ summaryStatus: "failed", updatedAt: new Date() })
+            .where(eq(bookmarks.id, id));
+        }
+      })
+      .catch((err) => {
+        logger.error("Summary generation error on refresh", {
+          url: bookmark.url,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+  }
 
   return c.json(updated);
 });

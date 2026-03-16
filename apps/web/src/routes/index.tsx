@@ -20,7 +20,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type { Bookmark } from "@bookmark/types";
-import { SearchIcon, MessageCircle, BookmarkPlus } from "lucide-react";
+import { SearchIcon, MessageCircle, BookmarkPlus, SparklesIcon, TagIcon } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 import {
@@ -33,6 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@bookmark/ui/components/alert-dialog";
+import { Badge } from "@bookmark/ui/components/badge";
 import { DataGrid } from "../components/data-grid/data-grid";
 import { DataGridPagination } from "../components/data-grid/data-grid-pagination";
 import {
@@ -43,13 +44,14 @@ import {
 import { Kbd, KbdGroup } from "@bookmark/ui/components/kbd";
 import { toast } from "sonner";
 import { Button } from "@bookmark/ui/components/button";
-import { fetchBookmarks, getWhatsAppStatus } from "../utils/api";
+import { fetchBookmarks, fetchTags, getWhatsAppStatus } from "../utils/api";
 import { useLibraryShortcuts } from "../hooks/useKeyboardShortcuts";
 import {
   useDeleteBookmarkMutation,
   useMarkReadMutation,
 } from "../hooks/useBookmarkMutations";
 import { BookmarkRow } from "../components/BookmarkRow";
+import { EditBookmarkDialog } from "../components/EditBookmarkDialog";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -60,6 +62,8 @@ function HomePage() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [copiedBookmarkId, setCopiedBookmarkId] = useState<number | null>(null);
   const deferredSearch = useDeferredValue(search);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Bookmark | null>(null);
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -71,15 +75,23 @@ function HomePage() {
     queryKey: [
       "bookmarks",
       deferredSearch,
+      selectedTag,
       pagination.pageIndex,
       pagination.pageSize,
     ],
     queryFn: () =>
       fetchBookmarks({
         search: deferredSearch || undefined,
+        tags: selectedTag ? [selectedTag] : undefined,
         limit: pagination.pageSize,
         offset: pagination.pageIndex * pagination.pageSize,
       }),
+  });
+
+  const { data: tagsData } = useQuery({
+    queryKey: ["tags"],
+    queryFn: fetchTags,
+    staleTime: 60_000,
   });
 
   const { data: whatsappStatus } = useQuery({
@@ -95,6 +107,7 @@ function HomePage() {
   const [deleteTarget, setDeleteTarget] = useState<Bookmark | null>(null);
 
   const bookmarksList = data?.bookmarks ?? [];
+  const tagsList = tagsData ?? [];
 
   useLibraryShortcuts({
     bookmarks: bookmarksList,
@@ -111,6 +124,7 @@ function HomePage() {
     onClearSelection: () => {},
     onClearSearch: () => {
       setSearch("");
+      setSelectedTag(null);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },
     hasSelection: false,
@@ -138,7 +152,7 @@ function HomePage() {
     data: bookmarksList,
     pageCount: Math.ceil(total / pagination.pageSize),
     getRowId: (row) => String(row.id),
-    getRowCanExpand: (row) => Boolean(row.original.description),
+    getRowCanExpand: (row) => Boolean(row.original.description || row.original.summary || row.original.summaryStatus === "pending"),
     manualPagination: true,
     state: { pagination, sorting },
     onPaginationChange: setPagination,
@@ -180,7 +194,7 @@ function HomePage() {
     function handleKeyDown(e: KeyboardEvent) {
       if (isInputFocused()) return;
       // Don't intercept keys when a dialog/modal is open
-      if (document.querySelector("[data-slot=alert-dialog-content]")) return;
+      if (document.querySelector("[data-slot=alert-dialog-content]") || document.querySelector("[data-slot=dialog-content]")) return;
 
       const key = e.key;
 
@@ -229,6 +243,10 @@ function HomePage() {
         if (rows[focusedIndex]) {
           rows[focusedIndex].toggleExpanded();
         }
+      } else if (key === "e" && focusedIndex >= 0) {
+        e.preventDefault();
+        const b = bookmarksList[focusedIndex];
+        if (b) setEditTarget(b);
       }
     }
 
@@ -238,6 +256,17 @@ function HomePage() {
 
   function handleSearchChange(value: string) {
     setSearch(value);
+    setSelectedTag(null);
+    setPagination((p) => ({ ...p, pageIndex: 0 }));
+  }
+
+  function handleTagClick(tag: string) {
+    if (selectedTag === tag) {
+      setSelectedTag(null);
+    } else {
+      setSelectedTag(tag);
+      setSearch("");
+    }
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }
 
@@ -251,6 +280,11 @@ function HomePage() {
 
   const handleDelete = useCallback(
     (bookmark: Bookmark) => setDeleteTarget(bookmark),
+    [],
+  );
+
+  const handleEdit = useCallback(
+    (bookmark: Bookmark) => setEditTarget(bookmark),
     [],
   );
 
@@ -281,11 +315,79 @@ function HomePage() {
           className="text-sm sm:text-base h-11 sm:h-14"
         />
         <InputGroupAddon align="inline-end">
+          {data?.searchMode === "smart" && deferredSearch && (
+            <span className="inline-flex items-center gap-1 text-xs text-primary mr-2" title="AI-powered search">
+              <SparklesIcon className="size-3.5" />
+              <span className="hidden sm:inline">Smart</span>
+            </span>
+          )}
           <Kbd className="hidden sm:inline-flex text-base h-8 px-3">
             {searchFocused ? "Esc" : "/"}
           </Kbd>
         </InputGroupAddon>
       </InputGroup>
+
+      {/* Tags / Collections bar */}
+      {tagsList.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <TagIcon className="size-4 text-muted-foreground shrink-0" />
+          <div className="flex gap-1.5">
+            {tagsList.map(({ tag, count }) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => handleTagClick(tag)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                  selectedTag === tag
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                }`}
+              >
+                {tag}
+                <span className={`text-[10px] ${selectedTag === tag ? "text-primary-foreground/70" : "text-muted-foreground/60"}`}>
+                  {count}
+                </span>
+              </button>
+            ))}
+          </div>
+          {selectedTag && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTag(null);
+                setPagination((p) => ({ ...p, pageIndex: 0 }));
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground shrink-0 ml-1"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Active tag filter indicator */}
+      {selectedTag && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filtered by</span>
+          <Badge variant="secondary" className="gap-1">
+            {selectedTag}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTag(null);
+                setPagination((p) => ({ ...p, pageIndex: 0 }));
+              }}
+              className="rounded-full p-0.5 hover:bg-muted-foreground/20 ml-0.5"
+            >
+              <span className="sr-only">Remove filter</span>
+              <span aria-hidden="true" className="text-xs leading-none">&times;</span>
+            </button>
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            {total} {total === 1 ? "bookmark" : "bookmarks"}
+          </span>
+        </div>
+      )}
 
       {/* Keyboard shortcuts hint — hidden on mobile (touch devices don't use keyboard) */}
       <div
@@ -317,13 +419,17 @@ function HomePage() {
         </span>
 
         <span className="inline-flex items-center gap-1.5">
+          <Kbd>E</Kbd> edit
+        </span>
+
+        <span className="inline-flex items-center gap-1.5">
           <Kbd>D</Kbd> delete
         </span>
       </div>
 
       {/* Table */}
       <div ref={tableRef}>
-        {!isLoading && total === 0 && !deferredSearch ? (
+        {!isLoading && total === 0 && !deferredSearch && !selectedTag ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center gap-4">
             {whatsappStatus?.connected ? (
               <>
@@ -364,7 +470,7 @@ function HomePage() {
             recordCount={total}
             isLoading={isLoading}
             loadingMode="skeleton"
-            emptyMessage="No bookmarks match your search"
+            emptyMessage={selectedTag ? `No bookmarks tagged "${selectedTag}"` : "No bookmarks match your search"}
             tableLayout={{ headerBackground: false, rowBorder: true }}
           >
             <div className="space-y-4">
@@ -384,6 +490,7 @@ function HomePage() {
                     onToggleExpanded={row.getToggleExpandedHandler()}
                     onOpenLink={handleOpenLink}
                     onDelete={handleDelete}
+                    onEdit={handleEdit}
                     isPendingDelete={deleteMutation.isPending}
                   />
                 ))}
@@ -398,6 +505,15 @@ function HomePage() {
           </DataGrid>
         )}
       </div>
+
+      {/* Edit bookmark dialog */}
+      <EditBookmarkDialog
+        bookmark={editTarget}
+        open={editTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditTarget(null);
+        }}
+      />
 
       {/* Delete confirmation */}
       <AlertDialog

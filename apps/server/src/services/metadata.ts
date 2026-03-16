@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { getClient } from "./gemini-client";
 import { logger } from "../utils/logger";
 
 export interface Metadata {
@@ -11,6 +12,10 @@ export interface Metadata {
 }
 
 export async function fetchMetadata(url: string): Promise<Metadata> {
+  const domain = new URL(url).hostname;
+  const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+
+  // Try cheerio-based crawling first
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(10_000),
@@ -22,69 +27,176 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
     });
 
     const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.includes("text/html")) {
-      logger.warn("Non-HTML content", { url, contentType });
-      return { domain: new URL(url).hostname, success: false };
-    }
+    // Non-2xx responses are likely error/block pages — skip parsing
+    const isBlocked = res.status >= 400;
 
-    const html = await res.text();
-    const $ = cheerio.load(html);
+    if (contentType.includes("text/html") && !isBlocked) {
+      const html = await res.text();
+      const $ = cheerio.load(html);
 
-    const title =
-      $('meta[property="og:title"]').attr("content") ??
-      $('meta[name="twitter:title"]').attr("content") ??
-      $("title").text() ??
-      undefined;
+      const title =
+        $('meta[property="og:title"]').attr("content") ??
+        $('meta[name="twitter:title"]').attr("content") ??
+        $("title").text() ??
+        undefined;
 
-    const description =
-      $('meta[property="og:description"]').attr("content") ??
-      $('meta[name="twitter:description"]').attr("content") ??
-      $('meta[name="description"]').attr("content") ??
-      undefined;
+      const description =
+        $('meta[property="og:description"]').attr("content") ??
+        $('meta[name="twitter:description"]').attr("content") ??
+        $('meta[name="description"]').attr("content") ??
+        undefined;
 
-    const image =
-      $('meta[property="og:image"]').attr("content") ??
-      $('meta[name="twitter:image"]').attr("content") ??
-      undefined;
+      const image =
+        $('meta[property="og:image"]').attr("content") ??
+        $('meta[name="twitter:image"]').attr("content") ??
+        undefined;
 
-    const resolveUrl = (relative?: string) => {
-      if (!relative) return undefined;
-      try {
-        return new URL(relative, url).href;
-      } catch {
-        return relative;
+      const resolveUrl = (relative?: string) => {
+        if (!relative) return undefined;
+        try {
+          return new URL(relative, url).href;
+        } catch {
+          return relative;
+        }
+      };
+
+      let cleanTitle = title?.trim().slice(0, 500);
+
+      if (cleanTitle && description) {
+        const descTrimmed = description.trim();
+        const idx = cleanTitle.indexOf(descTrimmed);
+        if (idx !== -1) {
+          cleanTitle = (cleanTitle.slice(0, idx) + cleanTitle.slice(idx + descTrimmed.length))
+            .replace(/[\s:|\-–—]+$/, "")
+            .replace(/^[\s:|\-–—]+/, "")
+            .trim();
+        }
       }
-    };
 
-    const domain = new URL(url).hostname;
-    const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+      // Detect junk titles from blocked/error pages that returned 200
+      const hasUsefulTitle = cleanTitle && !isJunkTitle(cleanTitle);
+      const hasUsefulDesc = description && !isJunkTitle(description.trim());
 
-    let cleanTitle = title?.trim().slice(0, 500);
-
-    // If the title contains the description (common on GitHub, etc.),
-    // strip the description portion to keep the title short.
-    if (cleanTitle && description) {
-      const descTrimmed = description.trim();
-      const idx = cleanTitle.indexOf(descTrimmed);
-      if (idx !== -1) {
-        // Remove the description and any leading separator like ": " or " - "
-        cleanTitle = (cleanTitle.slice(0, idx) + cleanTitle.slice(idx + descTrimmed.length))
-          .replace(/[\s:|\-–—]+$/, "")
-          .replace(/^[\s:|\-–—]+/, "")
-          .trim();
+      if (hasUsefulTitle || hasUsefulDesc) {
+        return {
+          title: hasUsefulTitle ? cleanTitle : undefined,
+          description: hasUsefulDesc ? description?.trim().slice(0, 1000) : undefined,
+          image: resolveUrl(image),
+          favicon,
+          domain,
+          success: true,
+        };
       }
-    }
 
+      logger.info("Crawled metadata looks like a block page, falling through to AI", {
+        url,
+        crawledTitle: cleanTitle,
+      });
+    }
+  } catch (error) {
+    logger.warn("Crawl-based metadata fetch failed", {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  // Fallback: use Gemini to infer metadata from the URL itself
+  const aiMeta = await inferMetadataFromUrl(url);
+  if (aiMeta) {
     return {
-      title: cleanTitle || undefined,
-      description: description?.trim().slice(0, 1000),
-      image: resolveUrl(image),
+      title: aiMeta.title,
+      description: aiMeta.description,
       favicon,
       domain,
       success: true,
     };
+  }
+
+  return { domain, favicon, success: false };
+}
+
+/** Detect titles that come from error/block/captcha pages, not real content */
+function isJunkTitle(title: string): boolean {
+  const lower = title.toLowerCase().trim();
+  const junkPatterns = [
+    "access denied",
+    "403 forbidden",
+    "404 not found",
+    "page not found",
+    "blocked",
+    "just a moment",           // Cloudflare challenge
+    "attention required",      // Cloudflare
+    "security check",
+    "are you a robot",
+    "captcha",
+    "please verify",
+    "error",
+    "unauthorized",
+    "forbidden",
+    "not acceptable",
+    "request rejected",
+    "pardon our interruption", // common WAF page
+    "checking your browser",
+    "please wait",
+    "one more step",
+    "verify you are human",
+  ];
+  return junkPatterns.some((p) => lower.includes(p));
+}
+
+interface AIMetadata {
+  title: string;
+  description: string;
+}
+
+const AI_METADATA_PROMPT = `You are analyzing a URL to generate metadata for a bookmark. The website blocked crawling, so you only have the URL. Analyze EVERYTHING in the URL: domain, path segments, category IDs, query parameters, filters, sort options, and any identifiers.
+
+Return a JSON object with exactly these fields:
+- "title": A concise, human-readable title for this bookmark (max 100 chars)
+- "description": A 1-2 sentence description of what this link likely contains, including specifics you can extract from the URL (max 300 chars)
+
+Be specific. Decode URL-encoded parameters. Examples:
+- instagram.com/p/ABC123 → "Instagram Post"
+- twitter.com/elonmusk/status/123 → "Post on X by @elonmusk"
+- youtube.com/watch?v=xyz → "YouTube Video"
+- nykaafashion.com/men/topwear/t-shirts/c/6825?f=sort%3Dbestseller%3Bcolor_filter%3D229 → "Nykaa Fashion — Men's T-Shirts (Bestsellers, filtered by color/size/price)"
+- amazon.com/dp/B08N5WRWNW → "Amazon Product (B08N5WRWNW)"
+- reddit.com/r/webdev/comments/... → "Reddit Post in r/webdev"
+
+Extract as much context as possible from filters, categories, and path structure.
+Return ONLY the JSON object, no other text.`;
+
+async function inferMetadataFromUrl(url: string): Promise<AIMetadata | null> {
+  const client = getClient();
+  if (!client) return null;
+
+  try {
+    const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const result = await model.generateContent([
+      AI_METADATA_PROMPT,
+      `URL: ${url}`,
+    ]);
+
+    const text = result.response.text().trim();
+    const cleaned = text
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/g, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
+    if (typeof parsed.title !== "string" || typeof parsed.description !== "string") {
+      return null;
+    }
+
+    return {
+      title: parsed.title.slice(0, 500),
+      description: parsed.description.slice(0, 1000),
+    };
   } catch (error) {
-    logger.error("Failed to fetch metadata", { url, error });
-    return { domain: new URL(url).hostname, success: false };
+    logger.warn("AI metadata inference failed", {
+      url,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
   }
 }

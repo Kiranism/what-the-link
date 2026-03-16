@@ -1,7 +1,8 @@
 import { memo } from "react";
 import type { Bookmark } from "@bookmark/types";
-import { ExternalLinkIcon, Trash2Icon } from "lucide-react";
+import { ExternalLinkIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@bookmark/ui/components/button";
+import { Badge } from "@bookmark/ui/components/badge";
 import { CopyButton } from "@bookmark/ui/components/animate-ui/components/buttons/copy";
 import {
   Collapsible,
@@ -19,6 +20,7 @@ interface BookmarkRowProps {
   onToggleExpanded: () => void;
   onOpenLink: (bookmark: Bookmark) => void;
   onDelete: (bookmark: Bookmark) => void;
+  onEdit: (bookmark: Bookmark) => void;
   isPendingDelete: boolean;
 }
 
@@ -30,8 +32,11 @@ export const BookmarkRow = memo(function BookmarkRow({
   onToggleExpanded,
   onOpenLink,
   onDelete,
+  onEdit,
   isPendingDelete,
 }: BookmarkRowProps) {
+  const tags = Array.isArray(bookmark.tags) ? bookmark.tags : [];
+
   return (
     <Frame
       id={`bookmark-row-${bookmark.id}`}
@@ -69,12 +74,24 @@ export const BookmarkRow = memo(function BookmarkRow({
             >
               {bookmark.title || bookmark.url}
             </a>
+            {tags.length > 0 && (
+              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                {tags.slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                    {tag}
+                  </Badge>
+                ))}
+                {tags.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground">+{tags.length - 2}</span>
+                )}
+              </div>
+            )}
             <span className="truncate text-xs text-muted-foreground/60 shrink-0">
               {bookmark.domain}
             </span>
           </div>
 
-          <div className="relative flex items-center shrink-0 min-w-[5.75rem] justify-end">
+          <div className="relative flex items-center shrink-0 min-w-[7.5rem] justify-end">
             <span
               className={`text-muted-foreground text-xs whitespace-nowrap transition-opacity group-hover/row:opacity-0 group-focus-within/row:opacity-0 ${isFocused ? "opacity-0" : ""}`}
             >
@@ -97,6 +114,15 @@ export const BookmarkRow = memo(function BookmarkRow({
                   if (copied) toast.success("Link copied to clipboard");
                 }}
               />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-7 text-muted-foreground hover:text-foreground"
+                aria-label="Edit bookmark"
+                onClick={() => onEdit(bookmark)}
+              >
+                <PencilIcon aria-hidden="true" className="size-3.5" />
+              </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -152,6 +178,18 @@ export const BookmarkRow = memo(function BookmarkRow({
               <span className="truncate text-xs text-muted-foreground">
                 {bookmark.domain}
               </span>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {tags.slice(0, 3).map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {tags.length > 3 && (
+                    <span className="text-[10px] text-muted-foreground self-center">+{tags.length - 3}</span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -180,6 +218,15 @@ export const BookmarkRow = memo(function BookmarkRow({
                 variant="ghost"
                 size="icon-sm"
                 className="size-8 text-muted-foreground hover:text-foreground"
+                aria-label="Edit bookmark"
+                onClick={() => onEdit(bookmark)}
+              >
+                <PencilIcon aria-hidden="true" className="size-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="size-8 text-muted-foreground hover:text-foreground"
                 aria-label="Open link"
                 onClick={() => onOpenLink(bookmark)}
               >
@@ -199,17 +246,38 @@ export const BookmarkRow = memo(function BookmarkRow({
           </div>
         </div>
 
-        {/* Expanded description */}
+        {/* Expanded description + AI summary */}
         <CollapsiblePanel>
-          <FramePanel className="px-3 py-3 sm:px-5 sm:py-5">
+          <FramePanel className="px-3 py-3 sm:px-5 sm:py-5 space-y-3">
+            {bookmark.summary ? (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground/70 mb-1">AI Summary</p>
+                <p className="text-foreground/80 text-xs sm:text-sm leading-5 sm:leading-6 whitespace-pre-wrap break-words">
+                  {bookmark.summary}
+                </p>
+              </div>
+            ) : bookmark.summaryStatus === "pending" ? (
+              <p className="text-muted-foreground text-xs sm:text-sm italic">
+                Generating summary...
+              </p>
+            ) : null}
             {bookmark.description ? (
               <p className="text-muted-foreground text-xs sm:text-sm leading-5 sm:leading-6 whitespace-pre-wrap break-words">
                 {bookmark.description}
               </p>
-            ) : (
+            ) : !bookmark.summary && bookmark.summaryStatus !== "pending" ? (
               <p className="text-muted-foreground text-xs sm:text-sm italic">
                 No description available
               </p>
+            ) : null}
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
             )}
           </FramePanel>
         </CollapsiblePanel>

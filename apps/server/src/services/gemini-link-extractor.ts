@@ -1,16 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-import { env } from "@bookmark/env/server";
+import { getClient, isGeminiConfigured } from "./gemini-client";
 import { logger } from "../utils/logger";
 
-let genAI: GoogleGenerativeAI | null = null;
-
-function getClient(): GoogleGenerativeAI | null {
-  if (!env.GEMINI_API_KEY) return null;
-  if (!genAI) {
-    genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-  }
-  return genAI;
-}
+export { isGeminiConfigured };
 
 const LINK_EXTRACTION_PROMPT = `Extract all URLs/links from the provided content. Return ONLY a JSON array of URL strings. Rules:
 - Include full URLs (with https:// prefix if missing in the original)
@@ -107,8 +98,4 @@ function parseUrlResponse(responseText: string): string[] {
     });
     return [];
   }
-}
-
-export function isGeminiConfigured(): boolean {
-  return !!env.GEMINI_API_KEY;
 }
