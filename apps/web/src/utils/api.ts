@@ -151,6 +151,13 @@ export async function getImportStatus(): Promise<ImportStatusResponse> {
   return res.json();
 }
 
+export async function dismissImportStatus(): Promise<void> {
+  const res = await authFetch(`${API_BASE}/bookmarks/import/status`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to dismiss import status");
+}
+
 export async function refreshBookmarkMetadata(id: number): Promise<Bookmark> {
   const res = await authFetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
     method: "POST",

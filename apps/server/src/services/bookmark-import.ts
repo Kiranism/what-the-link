@@ -90,6 +90,12 @@ export function getImportStatus(): ImportStatus {
   return { ...currentImport };
 }
 
+export function clearImportStatus(): void {
+  if (currentImport.state !== "importing") {
+    currentImport = { state: "idle" };
+  }
+}
+
 /**
  * Import parsed bookmarks into the database.
  * Skips duplicates, fetches metadata, triggers AI summary + tags.

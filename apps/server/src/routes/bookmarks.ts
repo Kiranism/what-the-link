@@ -7,7 +7,7 @@ import { generateSummary } from "../services/gemini-summarizer";
 import { generateTags } from "../services/gemini-tagger";
 import { isGeminiConfigured } from "../services/gemini-client";
 import { smartSearch } from "../services/smart-search";
-import { parseBookmarkHtml, importBookmarks, getImportStatus } from "../services/bookmark-import";
+import { parseBookmarkHtml, importBookmarks, getImportStatus, clearImportStatus } from "../services/bookmark-import";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { logger } from "../utils/logger";
@@ -196,6 +196,11 @@ bookmarksRouter.get("/import/status", async (c) => {
     import: importStatus,
     enrichment,
   });
+});
+
+bookmarksRouter.delete("/import/status", async (c) => {
+  clearImportStatus();
+  return c.json({ success: true });
 });
 
 bookmarksRouter.post("/bulk", async (c) => {

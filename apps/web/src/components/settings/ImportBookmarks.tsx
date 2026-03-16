@@ -21,6 +21,7 @@ import {
 import {
   importBookmarks,
   getImportStatus,
+  dismissImportStatus,
   type ImportResult,
 } from "../../utils/api";
 
@@ -86,6 +87,14 @@ export function ImportBookmarks() {
     const file = e.dataTransfer.files[0];
     if (file) handleFile(file);
   }
+
+  const dismissMutation = useMutation({
+    mutationFn: dismissImportStatus,
+    onSuccess: () => {
+      setLocalResult(null);
+      queryClient.invalidateQueries({ queryKey: ["import-status"] });
+    },
+  });
 
   // Show server-side result if we don't have a local one (page was closed and reopened)
   const displayResult = localResult ?? importState?.result ?? null;
@@ -202,13 +211,22 @@ export function ImportBookmarks() {
         {/* Import result */}
         {!isImporting && displayResult && (
           <div className="rounded-lg bg-muted/50 px-4 py-3 space-y-2">
-            <div className="flex items-center gap-2">
-              {displayResult.failed === 0 ? (
-                <CheckCircle2Icon className="size-4 text-green-500" />
-              ) : (
-                <AlertCircleIcon className="size-4 text-yellow-500" />
-              )}
-              <span className="text-sm font-medium">Import complete</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {displayResult.failed === 0 ? (
+                  <CheckCircle2Icon className="size-4 text-green-500" />
+                ) : (
+                  <AlertCircleIcon className="size-4 text-yellow-500" />
+                )}
+                <span className="text-sm font-medium">Import complete</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => dismissMutation.mutate()}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Dismiss
+              </button>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-muted-foreground">
               <span>Total in file:</span>
