@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Bookmark, BookmarkListResponse } from "@bookmark/types";
-import { updateBookmark, deleteBookmark } from "../utils/api";
+import { deleteBookmark } from "../utils/api";
 
 const QUERY_KEY = ["bookmarks"];
 
@@ -49,17 +49,5 @@ export function useDeleteBookmarkMutation(opts?: { onSuccess?: () => void }) {
       total: old.total - 1,
     }),
     onSuccess: opts?.onSuccess,
-  });
-}
-
-export function useMarkReadMutation() {
-  return useOptimisticBookmarkMutation<number>({
-    mutationFn: (id) => updateBookmark(id, { isRead: true }),
-    optimisticUpdate: (old, id) => ({
-      ...old,
-      bookmarks: old.bookmarks.map((b: Bookmark) =>
-        b.id === id ? { ...b, isRead: true } : b,
-      ),
-    }),
   });
 }

@@ -13,5 +13,4 @@ export interface UpdateBookmarkBody {
   tags?: string[];
 
   isArchived?: boolean;
-  isRead?: boolean;
 }

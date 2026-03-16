@@ -8,6 +8,7 @@ interface CacheEntry {
 }
 
 const cache = new Map<number, CacheEntry>();
+let detectedDimension: number | null = null;
 
 /**
  * Load all embeddings from the database into the in-memory cache.
@@ -37,7 +38,33 @@ export async function loadEmbeddingCache(): Promise<void> {
       }
     }
 
-    logger.info("Embedding cache loaded", { entries: loaded });
+    // Check dimension consistency across all loaded embeddings
+    let dimensionMismatchCount = 0;
+    detectedDimension = null;
+    for (const [id, entry] of cache) {
+      const dim = entry.embedding.length;
+      if (detectedDimension === null) {
+        detectedDimension = dim;
+      } else if (dim !== detectedDimension) {
+        dimensionMismatchCount++;
+        if (dimensionMismatchCount === 1) {
+          logger.warn("Embedding dimension mismatch detected", {
+            expectedDimension: detectedDimension,
+            mismatchedId: id,
+            mismatchedDimension: dim,
+          });
+        }
+      }
+    }
+    if (dimensionMismatchCount > 0) {
+      logger.warn("Embedding dimension mismatches in cache", {
+        expectedDimension: detectedDimension,
+        mismatchCount: dimensionMismatchCount,
+        totalEntries: loaded,
+      });
+    }
+
+    logger.info("Embedding cache loaded", { entries: loaded, dimension: detectedDimension });
   } catch (error) {
     logger.error("Failed to load embedding cache", {
       error: error instanceof Error ? error.message : String(error),
@@ -104,4 +131,12 @@ export function updateEmbeddingCacheArchived(id: number, isArchived: boolean): v
  */
 export function getEmbeddingCacheSize(): number {
   return cache.size;
+}
+
+/**
+ * Get the detected embedding dimension from loaded cache entries.
+ * Returns null if cache is empty.
+ */
+export function getEmbeddingDimension(): number | null {
+  return detectedDimension;
 }

@@ -19,6 +19,36 @@ export function extractQuestionQuery(text: string): string | null {
   return query.length > 0 ? query : null;
 }
 
+/**
+ * Returns true if the text is exactly "?help" (trimmed, case-insensitive).
+ */
+export function extractHelpCommand(text: string): boolean {
+  return text.trim().toLowerCase() === "?help";
+}
+
+export async function handleHelpCommand(
+  sock: WASocket,
+  remoteJid: string,
+  quotedMsg: any,
+): Promise<void> {
+  const helpText = `*Bookmark Bot Commands:*
+
+📌 *Save a link*
+Send any URL (with optional #tags)
+Example: https://example.com #design
+
+🔍 *Search*
+?query — semantic + text search
+?#tag — filter by tag
+?recent — last 5 bookmarks
+?recent 10 — last 10 bookmarks
+?help — show this help
+
+All links are auto-tagged and summarized by AI.`;
+
+  await sock.sendMessage(remoteJid, { text: helpText }, { quoted: quotedMsg });
+}
+
 export async function handleSearchCommand(
   sock: WASocket,
   remoteJid: string,
@@ -65,8 +95,11 @@ export async function handleSearchCommand(
     return;
   }
 
-  // Special keyword: "recent"
-  if (trimmed === "recent") {
+  // Special keyword: "recent" or "recent N"
+  const recentMatch = trimmed.match(/^recent(?:\s+(\d+))?$/i);
+  if (recentMatch) {
+    const requestedCount = recentMatch[1] ? Math.min(parseInt(recentMatch[1], 10), 20) : MAX_SEARCH_RESULTS;
+    const recentLimit = requestedCount > 0 ? requestedCount : MAX_SEARCH_RESULTS;
     try {
       const conditions = [eq(bookmarks.isArchived, false)];
       const results = await db
@@ -74,7 +107,7 @@ export async function handleSearchCommand(
         .from(bookmarks)
         .where(and(...conditions))
         .orderBy(desc(bookmarks.createdAt))
-        .limit(MAX_SEARCH_RESULTS);
+        .limit(recentLimit);
 
       const countResult = await db
         .select({ count: sql<number>`count(*)` })
@@ -82,7 +115,7 @@ export async function handleSearchCommand(
         .where(and(...conditions));
       const count = countResult[0]?.count ?? 0;
 
-      await sendSearchResults(sock, remoteJid, trimmed, results, count, quotedMsg);
+      await sendSearchResults(sock, remoteJid, trimmed, results, count, quotedMsg, undefined, recentLimit);
     } catch (error) {
       logger.error("Search command failed", { query: trimmed, error });
       await sock.sendMessage(remoteJid, {
@@ -168,6 +201,7 @@ async function sendSearchResults(
   totalCount: number,
   quotedMsg: any,
   searchMode?: "smart" | "basic" | "semantic",
+  displayLimit?: number,
 ): Promise<void> {
   if (results.length === 0) {
     await sock.sendMessage(remoteJid, {
@@ -176,18 +210,22 @@ async function sendSearchResults(
     return;
   }
 
+  const limit = displayLimit ?? MAX_SEARCH_RESULTS;
   const modeLabel = searchMode === "smart" || searchMode === "semantic" ? " ✨" : "";
   const lines = [`*Search results for "${query}":*${modeLabel}\n`];
   for (let i = 0; i < results.length; i++) {
     const b = results[i]!;
+    const summarySnippet = b.summary
+      ? `\n   ${b.summary.length > 100 ? b.summary.slice(0, 100) + "..." : b.summary}`
+      : "";
     const tags = Array.isArray(b.tags) && b.tags.length > 0
       ? `\n   ${b.tags.map((t: string) => `#${t}`).join(" ")}`
       : "";
-    lines.push(`${i + 1}. ${b.title ?? b.url}\n   ${b.url}${tags}`);
+    lines.push(`${i + 1}. ${b.title ?? b.url}\n   ${b.url}${summarySnippet}${tags}`);
   }
 
-  if (Number(totalCount) > MAX_SEARCH_RESULTS) {
-    lines.push(`\n_Showing ${MAX_SEARCH_RESULTS} of ${totalCount} results_`);
+  if (Number(totalCount) > limit) {
+    lines.push(`\n_Showing ${limit} of ${totalCount} results_`);
   }
 
   await sock.sendMessage(remoteJid, { text: lines.join("\n") }, { quoted: quotedMsg });

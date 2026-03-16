@@ -48,7 +48,6 @@ import { fetchBookmarks, fetchTags, getWhatsAppStatus } from "../utils/api";
 import { useLibraryShortcuts } from "../hooks/useKeyboardShortcuts";
 import {
   useDeleteBookmarkMutation,
-  useMarkReadMutation,
 } from "../hooks/useBookmarkMutations";
 import { BookmarkRow } from "../components/BookmarkRow";
 import { EditBookmarkDialog } from "../components/EditBookmarkDialog";
@@ -101,7 +100,6 @@ function HomePage() {
   });
 
   const deleteMutation = useDeleteBookmarkMutation();
-  const readMutation = useMarkReadMutation();
 
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [deleteTarget, setDeleteTarget] = useState<Bookmark | null>(null);
@@ -117,7 +115,6 @@ function HomePage() {
       const b = bookmarksList.find((bm) => bm.id === id);
       if (b) setDeleteTarget(b);
     },
-    onRead: (id) => readMutation.mutate(id),
     onSelect: () => {},
     onSelectAll: () => {},
     onArchiveSelected: () => {},
@@ -230,7 +227,6 @@ function HomePage() {
         if (!b) return;
         if (e.metaKey || e.ctrlKey) {
           window.open(b.url, "_blank", "noopener,noreferrer");
-          if (!b.isRead) readMutation.mutate(b.id);
         } else {
           navigator.clipboard.writeText(b.url);
           toast.success("Link copied to clipboard");
@@ -252,7 +248,7 @@ function HomePage() {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [bookmarksList, focusedIndex, readMutation, setFocusedIndex, table]);
+  }, [bookmarksList, focusedIndex, setFocusedIndex, table]);
 
   function handleSearchChange(value: string) {
     setSearch(value);
@@ -273,9 +269,8 @@ function HomePage() {
   const handleOpenLink = useCallback(
     (bookmark: Bookmark) => {
       window.open(bookmark.url, "_blank", "noopener,noreferrer");
-      if (!bookmark.isRead) readMutation.mutate(bookmark.id);
     },
-    [readMutation],
+    [],
   );
 
   const handleDelete = useCallback(

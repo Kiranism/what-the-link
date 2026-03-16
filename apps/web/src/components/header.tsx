@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@bookmark/ui/components/button";
 import {
   DropdownMenu,
@@ -16,7 +15,6 @@ import {
   UserIcon,
 } from "lucide-react";
 import { useTheme } from "better-themes";
-import { fetchBookmarks } from "../utils/api";
 import { useAuth } from "../hooks/useAuth";
 
 const links = [
@@ -26,15 +24,6 @@ const links = [
 
 export default function Header() {
   const { isAuthenticated, logout } = useAuth();
-
-  const { data: unreadData } = useQuery({
-    queryKey: ["bookmarks", "unread-count"],
-    queryFn: () => fetchBookmarks({ unread: true, limit: 1 }),
-    staleTime: 30_000,
-    enabled: isAuthenticated,
-  });
-
-  const unreadCount = unreadData?.total ?? 0;
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/40 bg-background/80 backdrop-blur-xl">

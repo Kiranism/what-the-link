@@ -24,7 +24,6 @@ export const bookmarks = sqliteTable(
       .notNull()
       .default(false),
 
-    isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

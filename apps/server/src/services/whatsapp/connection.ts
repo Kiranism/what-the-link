@@ -23,7 +23,7 @@ import {
 import { Boom } from "@hapi/boom";
 import fs from "fs";
 import pkg from "qrcode";
-import { handleSearchCommand, extractQuestionQuery } from "./commands";
+import { handleSearchCommand, extractQuestionQuery, extractHelpCommand, handleHelpCommand } from "./commands";
 
 const { toDataURL } = pkg;
 
@@ -233,6 +233,12 @@ export async function initWhatsApp(): Promise<void> {
       const remoteJid = msg.key.remoteJid;
       const hasImage = !!(msg.message as any)?.imageMessage;
 
+      // --- Help command ---
+      if (text && remoteJid && sock && extractHelpCommand(text)) {
+        await handleHelpCommand(sock, remoteJid, msg);
+        continue;
+      }
+
       // --- Question query: messages starting with "?" ---
       if (text && remoteJid && sock) {
         const questionQuery = extractQuestionQuery(text);
@@ -319,12 +325,20 @@ export async function initWhatsApp(): Promise<void> {
 
           const metadata = await fetchMetadata(url);
 
+          // Extract user's note: remaining text after removing URLs and hashtags
+          const userNote = text
+            ? text
+                .replace(/https?:\/\/[^\s]+/gi, "")
+                .replace(/#\w+/g, "")
+                .trim()
+            : "";
+
           const aiReady = isAIConfigured();
 
           const [inserted] = await db.insert(bookmarks).values({
             url,
             title: metadata.title ?? url,
-            description: metadata.description ?? null,
+            description: userNote || (metadata.description ?? null),
             image: metadata.image ?? null,
             favicon: metadata.favicon ?? null,
             domain: metadata.domain,

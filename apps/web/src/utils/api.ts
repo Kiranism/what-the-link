@@ -19,7 +19,6 @@ export interface FetchBookmarksParams {
   tags?: string[];
   domain?: string;
 
-  unread?: boolean;
   archived?: boolean;
   limit?: number;
   offset?: number;
@@ -33,7 +32,6 @@ export async function fetchBookmarks(
   if (params.tags?.length) searchParams.set("tag", params.tags.join(","));
   if (params.domain) searchParams.set("domain", params.domain);
 
-  if (params.unread) searchParams.set("unread", "true");
   if (params.archived) searchParams.set("archived", "true");
   if (params.limit != null) searchParams.set("limit", String(params.limit));
   if (params.offset != null) searchParams.set("offset", String(params.offset));
@@ -94,7 +92,7 @@ export async function fetchTags(): Promise<TagCount[]> {
   return data.tags ?? [];
 }
 
-export type BulkAction = "archive" | "unarchive" | "markRead" | "delete" | "addTags";
+export type BulkAction = "archive" | "unarchive" | "delete" | "addTags";
 
 export async function bulkUpdateBookmarks(
   ids: number[],

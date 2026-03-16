@@ -9,7 +9,6 @@ export interface Bookmark {
   tags: string[];
   isArchived: boolean;
 
-  isRead: boolean;
   createdAt: Date;
   updatedAt: Date;
   source: string;

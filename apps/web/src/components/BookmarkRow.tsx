@@ -42,7 +42,7 @@ export const BookmarkRow = memo(function BookmarkRow({
       id={`bookmark-row-${bookmark.id}`}
       role="option"
       aria-selected={isFocused}
-      aria-label={`${bookmark.title || bookmark.url}${bookmark.isRead ? "" : ", unread"}`}
+      aria-label={`${bookmark.title || bookmark.url}`}
       className={`w-full group/row bg-muted/40 p-0 sm:p-1 rounded-xl sm:rounded-2xl transition-[background-color] duration-150 ${isFocused ? "bg-muted!" : "hover:bg-muted!"}`}
       data-bookmark-row
     >

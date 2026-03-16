@@ -13,7 +13,8 @@ export function extractURLs(text: string): string[] {
       } catch {
         return false;
       }
-    });
+    })
+    .map((url) => normalizeUrl(url));
 }
 
 export function extractHashtags(text: string): string[] {
@@ -26,10 +27,59 @@ export function extractHashtags(text: string): string[] {
 }
 
 
+const TRACKING_PARAMS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "utm_id",
+  "fbclid",
+  "gclid",
+  "gclsrc",
+  "dclid",
+  "msclkid",
+  "twclid",
+  "igshid",
+  "mc_cid",
+  "mc_eid",
+  "ref",
+  "ref_src",
+  "ref_url",
+  "si",
+  "feature",
+  "s",
+  "t",
+]);
+
 export function normalizeUrl(url: string): string {
   const trimmed = url.trim();
-  if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
-    return `https://${trimmed}`;
+  const withProtocol =
+    trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? trimmed
+      : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withProtocol);
+
+    // Strip tracking parameters
+    for (const param of [...parsed.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(param)) {
+        parsed.searchParams.delete(param);
+      }
+    }
+
+    // Remove empty search string (when all params were stripped)
+    let result = parsed.toString();
+    if (parsed.searchParams.size === 0) {
+      result = result.replace(/\?$/, "");
+    }
+
+    // Remove trailing slash from path (but keep root "/")
+    result = result.replace(/\/(\?|#|$)/, "$1");
+
+    return result;
+  } catch {
+    return withProtocol;
   }
-  return trimmed;
 }

@@ -7,6 +7,7 @@ import {
   AlertCircleIcon,
   SparklesIcon,
   LoaderIcon,
+  DownloadIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -285,7 +286,7 @@ export function ImportBookmarks() {
             </div>
             {pendingCount > 0 && (
               <p className="text-xs text-muted-foreground">
-                Processing ~10 every 5 minutes in the background.
+                Processing in the background...
               </p>
             )}
             {stuckCount > 0 && (
@@ -306,6 +307,34 @@ export function ImportBookmarks() {
             )}
           </div>
         )}
+
+        {/* Divider */}
+        <div className="border-t border-border/60" />
+
+        {/* Export section */}
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium">Export Bookmarks</p>
+            <p className="text-xs text-muted-foreground">
+              Download all bookmarks as a JSON file
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const a = document.createElement("a");
+              a.href = "/api/bookmarks/export";
+              a.download = "bookmarks-export.json";
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}
+          >
+            <DownloadIcon className="size-4 mr-2" />
+            Export
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

@@ -11,10 +11,10 @@ import {
 const commands = [
   {
     label: "Save a bookmark",
-    description: "Send any URL to save it",
+    description: "Send any URL to save it (text after URL becomes a note)",
     examples: [
       "https://example.com",
-      "https://example.com #design #inspiration",
+      "https://example.com great React tutorial #react #web-dev",
     ],
   },
   {
@@ -24,6 +24,8 @@ const commands = [
       "?react tutorials",
       "?#design",
       "?recent",
+      "?recent 10",
+      "?help",
     ],
   },
 ];

@@ -55,7 +55,6 @@ bookmarksRouter.get("/", async (c) => {
   const tag = c.req.query("tag");
   const domain = c.req.query("domain");
 
-  const unread = c.req.query("unread") === "true";
   const archived = c.req.query("archived") === "true";
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
   const offset = Number(c.req.query("offset")) || 0;
@@ -131,10 +130,6 @@ bookmarksRouter.get("/", async (c) => {
     conditions.push(eq(bookmarks.domain, domain.trim()));
   }
 
-
-  if (unread) {
-    conditions.push(eq(bookmarks.isRead, false));
-  }
 
   const whereClause = and(...conditions);
 
@@ -314,6 +309,31 @@ bookmarksRouter.post("/retry-embeddings", async (c) => {
   return c.json({ reset: result.length });
 });
 
+bookmarksRouter.get("/export", async (c) => {
+  const includeArchived = c.req.query("archived") === "true";
+
+  const conditions = includeArchived ? [] : [eq(bookmarks.isArchived, false)];
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const results = await db
+    .select({
+      url: bookmarks.url,
+      title: bookmarks.title,
+      description: bookmarks.description,
+      tags: bookmarks.tags,
+      domain: bookmarks.domain,
+      summary: bookmarks.summary,
+      createdAt: bookmarks.createdAt,
+    })
+    .from(bookmarks)
+    .where(whereClause)
+    .orderBy(desc(bookmarks.createdAt));
+
+  c.header("Content-Type", "application/json");
+  c.header("Content-Disposition", 'attachment; filename="bookmarks-export.json"');
+  return c.json(results);
+});
+
 bookmarksRouter.delete("/import/status", async (c) => {
   clearImportStatus();
   return c.json({ success: true });
@@ -347,9 +367,6 @@ bookmarksRouter.post("/bulk", async (c) => {
       for (const id of ids) updateEmbeddingCacheArchived(id, false);
       break;
 
-    case "markRead":
-      await db.update(bookmarks).set({ isRead: true, updatedAt: now }).where(inArray(bookmarks.id, ids));
-      break;
     case "delete":
       await db.delete(bookmarks).where(inArray(bookmarks.id, ids));
       for (const id of ids) removeEmbeddingCacheEntry(id);
@@ -510,7 +527,6 @@ bookmarksRouter.patch("/:id", async (c) => {
     "tags",
 
     "isArchived",
-    "isRead",
   ];
   const updates: Partial<NewBookmark> = {};
   for (const key of allowed) {

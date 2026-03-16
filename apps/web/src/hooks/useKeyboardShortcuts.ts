@@ -87,11 +87,10 @@ export function useNavigationShortcuts() {
 }
 
 interface UseLibraryShortcutsOptions {
-  bookmarks: Array<{ id: number; url: string; isRead: boolean }>;
+  bookmarks: Array<{ id: number; url: string }>;
   focusedIndex: number;
   setFocusedIndex: (index: number | ((prev: number) => number)) => void;
   onDelete: (id: number) => void;
-  onRead: (id: number) => void;
   onSelect: (id: number) => void;
   onSelectAll: () => void;
   onArchiveSelected: () => void;
@@ -106,7 +105,6 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
     focusedIndex,
     setFocusedIndex,
     onDelete,
-    onRead,
     onSelect,
     onSelectAll,
     onArchiveSelected,
@@ -140,7 +138,6 @@ export function useLibraryShortcuts(opts: UseLibraryShortcutsOptions) {
     const b = getFocusedBookmark();
     if (b) {
       window.open(b.url, "_blank", "noopener,noreferrer");
-      if (!b.isRead) onRead(b.id);
     }
   });
 
