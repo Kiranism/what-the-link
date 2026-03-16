@@ -98,7 +98,7 @@ export function EditBookmarkDialog({
             <label className="text-xs font-medium text-muted-foreground mb-1 block">
               URL
             </label>
-            <p className="text-sm text-foreground/70 truncate">{bookmark.url}</p>
+            <p className="text-sm text-foreground/70 break-all line-clamp-2">{bookmark.url}</p>
           </div>
 
           {/* Title */}
