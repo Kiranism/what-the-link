@@ -37,6 +37,10 @@ export async function handleHelpCommand(
 Send any URL (with optional #tags)
 Example: https://example.com #design
 
+📝 *Save a note*
+Send any text without a URL
+Example: Check out that new CSS framework next week
+
 🔍 *Search*
 ?query — semantic + text search
 ?#tag — filter by tag

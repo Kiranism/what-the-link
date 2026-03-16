@@ -296,7 +296,65 @@ export async function initWhatsApp(): Promise<void> {
         }
       }
 
-      if (urls.length === 0) continue;
+      // --- Save plain text as a note bookmark (no URLs found) ---
+      if (urls.length === 0) {
+        if (text && remoteJid && sock) {
+          // Strip hashtags to get the "body" text
+          const noteBody = text.replace(/#\w+/g, "").trim();
+
+          // Skip empty, too-short, or emoji-only messages
+          const isEmojiOnly = /^\p{Emoji_Presentation}+$/u.test(noteBody);
+          if (noteBody.length >= 3 && !isEmojiOnly) {
+            try {
+              const noteUrl = `note://${Date.now()}`;
+              const noteTitle = text.length > 100 ? text.slice(0, 100) : text;
+              const aiReady = isAIConfigured();
+
+              const [inserted] = await db.insert(bookmarks).values({
+                url: noteUrl,
+                title: noteTitle,
+                description: text,
+                domain: "note",
+                tags: tags.length > 0 ? tags : [],
+                source: "whatsapp",
+                whatsappMessageId: msg.key.id,
+                metadataStatus: "skipped",
+                summaryStatus: "skipped",
+                embeddingStatus: "pending",
+              }).returning();
+
+              logger.info("Note saved", { noteUrl, title: noteTitle, tags });
+
+              // Auto-tag when no user-provided hashtags
+              if (aiReady && inserted && tags.length === 0) {
+                generateTags(noteUrl, noteTitle, text)
+                  .then(async (aiTags) => {
+                    if (aiTags.length > 0) {
+                      await db
+                        .update(bookmarks)
+                        .set({ tags: aiTags, updatedAt: new Date() })
+                        .where(eq(bookmarks.id, inserted.id));
+                      logger.info("Auto-tags generated for note", { noteUrl, tags: aiTags });
+                    }
+                  })
+                  .catch((err) => {
+                    logger.error("Auto-tagging error for note", {
+                      noteUrl,
+                      error: err instanceof Error ? err.message : String(err),
+                    });
+                  });
+              }
+
+              await sock.sendMessage(remoteJid, {
+                react: { text: "\uD83D\uDCDD", key: msg.key },
+              });
+            } catch (error) {
+              logger.error("Failed to save note", { error });
+            }
+          }
+        }
+        continue;
+      }
 
       // --- Save each extracted URL as a bookmark ---
       let savedCount = 0;
@@ -437,6 +495,10 @@ export async function initWhatsApp(): Promise<void> {
       }
     }
   });
+}
+
+export function getSocket(): WASocket | null {
+  return sock;
 }
 
 export function getQRCode(): string | null {

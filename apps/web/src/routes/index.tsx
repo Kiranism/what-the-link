@@ -4,7 +4,6 @@ import {
   useMemo,
   useRef,
   useState,
-  useDeferredValue,
 } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -58,9 +57,9 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const [search, setSearch] = useState("");
+  const [submittedSearch, setSubmittedSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [copiedBookmarkId, setCopiedBookmarkId] = useState<number | null>(null);
-  const deferredSearch = useDeferredValue(search);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<Bookmark | null>(null);
 
@@ -73,14 +72,14 @@ function HomePage() {
   const { data, isLoading } = useQuery({
     queryKey: [
       "bookmarks",
-      deferredSearch,
+      submittedSearch,
       selectedTag,
       pagination.pageIndex,
       pagination.pageSize,
     ],
     queryFn: () =>
       fetchBookmarks({
-        search: deferredSearch || undefined,
+        search: submittedSearch || undefined,
         tags: selectedTag ? [selectedTag] : undefined,
         limit: pagination.pageSize,
         offset: pagination.pageIndex * pagination.pageSize,
@@ -121,6 +120,7 @@ function HomePage() {
     onClearSelection: () => {},
     onClearSearch: () => {
       setSearch("");
+      setSubmittedSearch("");
       setSelectedTag(null);
       setPagination((p) => ({ ...p, pageIndex: 0 }));
     },
@@ -252,8 +252,11 @@ function HomePage() {
 
   function handleSearchChange(value: string) {
     setSearch(value);
-    setSelectedTag(null);
-    setPagination((p) => ({ ...p, pageIndex: 0 }));
+    if (!value) {
+      setSubmittedSearch("");
+      setSelectedTag(null);
+      setPagination((p) => ({ ...p, pageIndex: 0 }));
+    }
   }
 
   function handleTagClick(tag: string) {
@@ -262,6 +265,7 @@ function HomePage() {
     } else {
       setSelectedTag(tag);
       setSearch("");
+      setSubmittedSearch("");
     }
     setPagination((p) => ({ ...p, pageIndex: 0 }));
   }
@@ -302,6 +306,11 @@ function HomePage() {
             if (e.key === "Escape") {
               e.preventDefault();
               (e.target as HTMLElement)?.blur();
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              setSubmittedSearch(search);
+              setSelectedTag(null);
+              setPagination((p) => ({ ...p, pageIndex: 0 }));
             } else if (e.key === "ArrowDown" && bookmarksList.length > 0) {
               e.preventDefault();
               setFocusedIndex(0);
@@ -310,7 +319,7 @@ function HomePage() {
           className="text-sm sm:text-base h-11 sm:h-14"
         />
         <InputGroupAddon align="inline-end">
-          {(data?.searchMode === "smart" || data?.searchMode === "semantic") && deferredSearch && (
+          {(data?.searchMode === "smart" || data?.searchMode === "semantic") && submittedSearch && (
             <span className="inline-flex items-center gap-1 text-xs text-primary mr-2" title="AI-powered search">
               <SparklesIcon className="size-3.5" />
               <span className="hidden sm:inline">Smart</span>
@@ -424,7 +433,7 @@ function HomePage() {
 
       {/* Table */}
       <div ref={tableRef}>
-        {!isLoading && total === 0 && !deferredSearch && !selectedTag ? (
+        {!isLoading && total === 0 && !submittedSearch && !selectedTag ? (
           <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center gap-4">
             {whatsappStatus?.connected ? (
               <>

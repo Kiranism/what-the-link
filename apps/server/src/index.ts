@@ -7,6 +7,7 @@ import { startMetadataRetryJob } from "./services/metadata-retry";
 import { startSummaryRetryJob } from "./services/summary-retry";
 import { loadEmbeddingCache } from "./services/embedding-cache";
 import { startEmbeddingRetryJob } from "./services/embedding-retry";
+import { startDailyDigest } from "./services/daily-digest";
 import { logger } from "./utils/logger";
 
 async function ensureNewColumns(): Promise<void> {
@@ -90,6 +91,7 @@ async function main() {
   startMetadataRetryJob();
   startSummaryRetryJob();
   startEmbeddingRetryJob();
+  startDailyDigest();
 
   startListening(PORT);
 }
