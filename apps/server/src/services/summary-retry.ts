@@ -7,12 +7,10 @@ import { isAIConfigured } from "./ai-client";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
-// Process 3 bookmarks every 30 minutes to stay well within free tier (20 req/day)
-// 3 bookmarks × ~2 calls each = ~6 requests per cycle
-// 48 cycles/day × 6 = ~288 requests/day max (but free tier is 20/day so we're safe
-// because most cycles will find 0 pending bookmarks)
-const BATCH_SIZE = 3;
-const RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+// OpenRouter paid — process aggressively for fast catch-up
+// Each bookmark = ~2 API calls (summary + tags), so 25 bookmarks = ~50 calls/cycle
+const BATCH_SIZE = 25;
+const RETRY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let rateLimitedUntil = 0;
@@ -148,6 +146,13 @@ export function startSummaryRetryJob(): void {
       });
     });
   }, RETRY_INTERVAL_MS);
+
+  // Run once immediately on startup to process any pending summaries
+  retryFailedSummaries().catch((err) => {
+    logger.error("Initial summary retry failed", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  });
 
   logger.info("Summary retry job started", {
     intervalMs: RETRY_INTERVAL_MS,
