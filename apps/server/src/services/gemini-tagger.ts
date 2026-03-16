@@ -22,9 +22,13 @@ export async function generateTags(
   description: string | null,
 ): Promise<string[]> {
   const client = getClient();
-  if (!client) return [];
+  if (!client) {
+    logger.warn("Gemini not configured, skipping tag generation", { url });
+    return [];
+  }
 
   try {
+    logger.info("Generating AI tags", { url, hasTitle: !!title, hasDescription: !!description });
     const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const context = [
@@ -51,11 +55,14 @@ export async function generateTags(
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed)) return [];
 
-    return parsed
+    const tags = parsed
       .filter((t): t is string => typeof t === "string")
       .map((t) => t.trim().toLowerCase().slice(0, 50))
       .filter((t) => t.length > 0)
       .slice(0, 5);
+
+    logger.info("AI tags generated successfully", { url, tags });
+    return tags;
   } catch (error) {
     logger.error("Gemini tag generation failed", {
       url,

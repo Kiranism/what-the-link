@@ -19,9 +19,13 @@ export async function generateSummary(
   description: string | null,
 ): Promise<string | null> {
   const client = getClient();
-  if (!client) return null;
+  if (!client) {
+    logger.warn("Gemini not configured, skipping summary generation", { url });
+    return null;
+  }
 
   try {
+    logger.info("Generating AI summary", { url, hasTitle: !!title, hasDescription: !!description });
     const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const context = [
@@ -38,8 +42,12 @@ export async function generateSummary(
     ]);
 
     const text = result.response.text().trim();
-    if (!text) return null;
+    if (!text) {
+      logger.warn("Gemini returned empty summary", { url });
+      return null;
+    }
 
+    logger.info("AI summary generated successfully", { url, length: text.length });
     return text.slice(0, MAX_SUMMARY_LENGTH);
   } catch (error) {
     logger.error("Gemini summary generation failed", {

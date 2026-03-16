@@ -26,72 +26,89 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
       },
     });
 
+    logger.info("Metadata crawl response", { url, status: res.status, contentType: res.headers.get("content-type") });
+
     const contentType = res.headers.get("content-type") ?? "";
     // Non-2xx responses are likely error/block pages — skip parsing
     const isBlocked = res.status >= 400;
 
-    if (contentType.includes("text/html") && !isBlocked) {
+    if (contentType.includes("text/html")) {
       const html = await res.text();
-      const $ = cheerio.load(html);
 
-      const title =
-        $('meta[property="og:title"]').attr("content") ??
-        $('meta[name="twitter:title"]').attr("content") ??
-        $("title").text() ??
-        undefined;
+      // If the response is blocked or very short HTML, skip cheerio entirely
+      if (isBlocked || html.length < 500) {
+        logger.info("Crawl returned block/minimal page, skipping cheerio", {
+          url,
+          status: res.status,
+          htmlLength: html.length,
+        });
+      } else {
+        const $ = cheerio.load(html);
 
-      const description =
-        $('meta[property="og:description"]').attr("content") ??
-        $('meta[name="twitter:description"]').attr("content") ??
-        $('meta[name="description"]').attr("content") ??
-        undefined;
+        const title =
+          $('meta[property="og:title"]').attr("content") ??
+          $('meta[name="twitter:title"]').attr("content") ??
+          $("title").text() ??
+          undefined;
 
-      const image =
-        $('meta[property="og:image"]').attr("content") ??
-        $('meta[name="twitter:image"]').attr("content") ??
-        undefined;
+        const description =
+          $('meta[property="og:description"]').attr("content") ??
+          $('meta[name="twitter:description"]').attr("content") ??
+          $('meta[name="description"]').attr("content") ??
+          undefined;
 
-      const resolveUrl = (relative?: string) => {
-        if (!relative) return undefined;
-        try {
-          return new URL(relative, url).href;
-        } catch {
-          return relative;
-        }
-      };
+        const image =
+          $('meta[property="og:image"]').attr("content") ??
+          $('meta[name="twitter:image"]').attr("content") ??
+          undefined;
 
-      let cleanTitle = title?.trim().slice(0, 500);
-
-      if (cleanTitle && description) {
-        const descTrimmed = description.trim();
-        const idx = cleanTitle.indexOf(descTrimmed);
-        if (idx !== -1) {
-          cleanTitle = (cleanTitle.slice(0, idx) + cleanTitle.slice(idx + descTrimmed.length))
-            .replace(/[\s:|\-–—]+$/, "")
-            .replace(/^[\s:|\-–—]+/, "")
-            .trim();
-        }
-      }
-
-      // Detect junk titles from blocked/error pages that returned 200
-      const hasUsefulTitle = cleanTitle && !isJunkTitle(cleanTitle);
-      const hasUsefulDesc = description && !isJunkTitle(description.trim());
-
-      if (hasUsefulTitle || hasUsefulDesc) {
-        return {
-          title: hasUsefulTitle ? cleanTitle : undefined,
-          description: hasUsefulDesc ? description?.trim().slice(0, 1000) : undefined,
-          image: resolveUrl(image),
-          favicon,
-          domain,
-          success: true,
+        const resolveUrl = (relative?: string) => {
+          if (!relative) return undefined;
+          try {
+            return new URL(relative, url).href;
+          } catch {
+            return relative;
+          }
         };
-      }
 
-      logger.info("Crawled metadata looks like a block page, falling through to AI", {
-        url,
-        crawledTitle: cleanTitle,
-      });
+        let cleanTitle = title?.trim().slice(0, 500);
+
+        if (cleanTitle && description) {
+          const descTrimmed = description.trim();
+          const idx = cleanTitle.indexOf(descTrimmed);
+          if (idx !== -1) {
+            cleanTitle = (cleanTitle.slice(0, idx) + cleanTitle.slice(idx + descTrimmed.length))
+              .replace(/[\s:|\-–—]+$/, "")
+              .replace(/^[\s:|\-–—]+/, "")
+              .trim();
+          }
+        }
+
+        // Detect junk titles from blocked/error pages that returned 200
+        const hasUsefulTitle = cleanTitle && cleanTitle.length > 0 && !isJunkTitle(cleanTitle);
+        const hasUsefulDesc = description && description.trim().length > 0 && !isJunkTitle(description.trim());
+
+        logger.info("Crawled metadata extracted", {
+          url,
+          crawledTitle: cleanTitle ?? "(empty)",
+          hasUsefulTitle,
+          hasUsefulDesc,
+          isJunk: cleanTitle ? isJunkTitle(cleanTitle) : false,
+        });
+
+        if (hasUsefulTitle || hasUsefulDesc) {
+          return {
+            title: hasUsefulTitle ? cleanTitle : undefined,
+            description: hasUsefulDesc ? description?.trim().slice(0, 1000) : undefined,
+            image: resolveUrl(image),
+            favicon,
+            domain,
+            success: true,
+          };
+        }
+      }
+    } else {
+      logger.info("Non-HTML response, skipping cheerio", { url, contentType });
     }
   } catch (error) {
     logger.warn("Crawl-based metadata fetch failed", {
@@ -101,8 +118,13 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
   }
 
   // Fallback: use Gemini to infer metadata from the URL itself
+  logger.info("Falling through to AI metadata inference", { url });
   const aiMeta = await inferMetadataFromUrl(url);
   if (aiMeta) {
+    logger.info("AI metadata inference succeeded", {
+      url,
+      title: aiMeta.title,
+    });
     return {
       title: aiMeta.title,
       description: aiMeta.description,
@@ -112,12 +134,15 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
     };
   }
 
+  logger.warn("All metadata methods failed", { url });
   return { domain, favicon, success: false };
 }
 
 /** Detect titles that come from error/block/captcha pages, not real content */
 function isJunkTitle(title: string): boolean {
   const lower = title.toLowerCase().trim();
+  // Empty or very short titles are junk
+  if (lower.length < 2) return true;
   const junkPatterns = [
     "access denied",
     "403 forbidden",
@@ -130,7 +155,6 @@ function isJunkTitle(title: string): boolean {
     "are you a robot",
     "captcha",
     "please verify",
-    "error",
     "unauthorized",
     "forbidden",
     "not acceptable",
@@ -140,7 +164,12 @@ function isJunkTitle(title: string): boolean {
     "please wait",
     "one more step",
     "verify you are human",
+    "robot or human",
+    "enable javascript",
+    "enable cookies",
   ];
+  // Exact match "error" but not as substring (avoid matching "error handling guide")
+  if (lower === "error") return true;
   return junkPatterns.some((p) => lower.includes(p));
 }
 
@@ -168,9 +197,13 @@ Return ONLY the JSON object, no other text.`;
 
 async function inferMetadataFromUrl(url: string): Promise<AIMetadata | null> {
   const client = getClient();
-  if (!client) return null;
+  if (!client) {
+    logger.warn("Gemini not configured, cannot infer metadata from URL", { url });
+    return null;
+  }
 
   try {
+    logger.info("Calling Gemini for AI metadata inference", { url });
     const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const result = await model.generateContent([
       AI_METADATA_PROMPT,
@@ -185,6 +218,7 @@ async function inferMetadataFromUrl(url: string): Promise<AIMetadata | null> {
 
     const parsed = JSON.parse(cleaned);
     if (typeof parsed.title !== "string" || typeof parsed.description !== "string") {
+      logger.warn("AI metadata response had unexpected shape", { url, response: cleaned });
       return null;
     }
 

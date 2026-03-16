@@ -339,6 +339,14 @@ export async function initWhatsApp(): Promise<void> {
           savedCount++;
 
           // Fire-and-forget: generate AI summary + auto-tags
+          logger.info("AI processing check", {
+            url,
+            geminiReady,
+            insertedId: inserted?.id,
+            metadataSuccess: metadata.success,
+            metadataTitle: metadata.title ?? "(none)",
+          });
+
           if (geminiReady && inserted) {
             const metaTitle = metadata.title ?? null;
             const metaDesc = metadata.description ?? null;
