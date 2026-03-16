@@ -133,6 +133,24 @@ export async function importBookmarks(file: File): Promise<ImportResult> {
   return res.json();
 }
 
+export interface ImportStatusResponse {
+  import: {
+    state: "idle" | "importing" | "complete" | "error";
+    progress?: { done: number; total: number };
+    result?: ImportResult;
+    error?: string;
+    startedAt?: number;
+    completedAt?: number;
+  };
+  enrichment: Record<string, number>;
+}
+
+export async function getImportStatus(): Promise<ImportStatusResponse> {
+  const res = await authFetch(`${API_BASE}/bookmarks/import/status`);
+  if (!res.ok) throw new Error("Failed to get import status");
+  return res.json();
+}
+
 export async function refreshBookmarkMetadata(id: number): Promise<Bookmark> {
   const res = await authFetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
     method: "POST",

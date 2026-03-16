@@ -7,7 +7,7 @@ import { generateSummary } from "../services/gemini-summarizer";
 import { generateTags } from "../services/gemini-tagger";
 import { isGeminiConfigured } from "../services/gemini-client";
 import { smartSearch } from "../services/smart-search";
-import { parseBookmarkHtml, importBookmarks } from "../services/bookmark-import";
+import { parseBookmarkHtml, importBookmarks, getImportStatus } from "../services/bookmark-import";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { logger } from "../utils/logger";
@@ -173,6 +173,29 @@ bookmarksRouter.post("/import", async (c) => {
     });
     return c.json({ error: "Import failed. Check the file format." }, 500);
   }
+});
+
+bookmarksRouter.get("/import/status", async (c) => {
+  const importStatus = getImportStatus();
+
+  // Also return AI enrichment stats
+  const aiStats = await db
+    .select({
+      status: bookmarks.summaryStatus,
+      count: sql<number>`count(*)`,
+    })
+    .from(bookmarks)
+    .groupBy(bookmarks.summaryStatus);
+
+  const enrichment: Record<string, number> = {};
+  for (const row of aiStats) {
+    enrichment[row.status] = row.count;
+  }
+
+  return c.json({
+    import: importStatus,
+    enrichment,
+  });
 });
 
 bookmarksRouter.post("/bulk", async (c) => {

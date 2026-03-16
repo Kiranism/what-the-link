@@ -75,16 +75,36 @@ export interface ImportResult {
   failed: number;
 }
 
+export interface ImportStatus {
+  state: "idle" | "importing" | "complete" | "error";
+  progress?: { done: number; total: number };
+  result?: ImportResult;
+  error?: string;
+  startedAt?: number;
+  completedAt?: number;
+}
+
+let currentImport: ImportStatus = { state: "idle" };
+
+export function getImportStatus(): ImportStatus {
+  return { ...currentImport };
+}
+
 /**
  * Import parsed bookmarks into the database.
  * Skips duplicates, fetches metadata, triggers AI summary + tags.
  */
 export async function importBookmarks(
   parsed: ParsedBookmark[],
-  onProgress?: (done: number, total: number) => void,
 ): Promise<ImportResult> {
   const result: ImportResult = { total: parsed.length, imported: 0, duplicates: 0, failed: 0 };
   const geminiReady = isGeminiConfigured();
+
+  currentImport = {
+    state: "importing",
+    progress: { done: 0, total: parsed.length },
+    startedAt: Date.now(),
+  };
 
   for (let i = 0; i < parsed.length; i++) {
     const bm = parsed[i]!;
@@ -98,7 +118,7 @@ export async function importBookmarks(
 
       if (existing) {
         result.duplicates++;
-        onProgress?.(i + 1, parsed.length);
+        currentImport.progress = { done: i + 1, total: parsed.length };
         continue;
       }
 
@@ -142,8 +162,15 @@ export async function importBookmarks(
       });
     }
 
-    onProgress?.(i + 1, parsed.length);
+    currentImport.progress = { done: i + 1, total: parsed.length };
   }
+
+  currentImport = {
+    state: "complete",
+    result,
+    completedAt: Date.now(),
+    startedAt: currentImport.startedAt,
+  };
 
   return result;
 }
