@@ -73,6 +73,7 @@ bookmarksRouter.get("/", async (c) => {
         like(bookmarks.description, term),
         like(bookmarks.url, term),
         like(bookmarks.summary, term),
+        sql`EXISTS (SELECT 1 FROM json_each(${bookmarks.tags}) AS je WHERE je.value LIKE ${term})`,
       )!,
     );
   }

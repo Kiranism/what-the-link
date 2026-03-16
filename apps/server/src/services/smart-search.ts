@@ -1,7 +1,7 @@
 import { getClient, isGeminiConfigured } from "./gemini-client";
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
-import { and, desc, eq, like, or } from "drizzle-orm";
+import { and, desc, eq, like, or, sql } from "drizzle-orm";
 import { logger } from "../utils/logger";
 
 export { isGeminiConfigured };
@@ -149,7 +149,7 @@ export async function smartSearch(
     // Phase 1: Expand query
     const terms = await expandQuery(query);
 
-    // Phase 2: Broad LIKE search with expanded terms
+    // Phase 2: Broad LIKE search with expanded terms (including tags)
     const likeConditions = terms.flatMap((term) => {
       const pattern = `%${term}%`;
       return [
@@ -157,6 +157,7 @@ export async function smartSearch(
         like(bookmarks.description, pattern),
         like(bookmarks.url, pattern),
         like(bookmarks.summary, pattern),
+        sql`EXISTS (SELECT 1 FROM json_each(${bookmarks.tags}) AS je WHERE je.value LIKE ${pattern})`,
       ];
     });
 

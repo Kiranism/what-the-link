@@ -123,8 +123,8 @@ export async function handleSearchCommand(
       }
     }
 
-    // Fallback to basic LIKE search
-    if (results.length === 0 && searchMode === "basic") {
+    // Fallback to basic LIKE search (also when smart search returned 0 results)
+    if (results.length === 0) {
       const conditions = [eq(bookmarks.isArchived, false)];
       const term = `%${trimmed}%`;
       conditions.push(
@@ -133,6 +133,7 @@ export async function handleSearchCommand(
           like(bookmarks.description, term),
           like(bookmarks.url, term),
           like(bookmarks.summary, term),
+          sql`EXISTS (SELECT 1 FROM json_each(${bookmarks.tags}) AS je WHERE je.value LIKE ${term})`,
         )!,
       );
 
