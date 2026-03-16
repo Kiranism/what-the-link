@@ -8,7 +8,9 @@ services:
       - APP_PASSWORD=${APP_PASSWORD:-changeme}
       - NODE_ENV=production
       - WA_AUTH_DIR=/data/whatsapp_auth
-      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - OPENROUTER_CHAT_MODEL=${OPENROUTER_CHAT_MODEL:-}
+      - OPENROUTER_EMBEDDING_MODEL=${OPENROUTER_EMBEDDING_MODEL:-}
     volumes:
       - ./data:/data
     restart: unless-stopped

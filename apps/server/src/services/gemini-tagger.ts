@@ -1,7 +1,7 @@
-import { getClient, isGeminiConfigured } from "./gemini-client";
+import { getAIClient, isAIConfigured, getChatModel } from "./ai-client";
 import { logger } from "../utils/logger";
 
-export { isGeminiConfigured };
+export { isAIConfigured };
 
 const TAGGING_PROMPT = `Given the following bookmark information, suggest 2-4 short, lowercase tags that categorize this content. Tags should be single words or short hyphenated phrases (e.g. "design", "web-dev", "cooking", "finance", "news", "social-media", "video", "shopping").
 
@@ -13,23 +13,22 @@ If title and description are missing (the site blocked crawling), analyze the UR
 Return ONLY a JSON array of tag strings, no other text.`;
 
 /**
- * Generate AI tags for a bookmark using Gemini.
- * Returns empty array if Gemini is not configured or on error.
+ * Generate AI tags for a bookmark.
+ * Returns empty array if AI is not configured or on error.
  */
 export async function generateTags(
   url: string,
   title: string | null,
   description: string | null,
 ): Promise<string[]> {
-  const client = getClient();
+  const client = getAIClient();
   if (!client) {
-    logger.warn("Gemini not configured, skipping tag generation", { url });
+    logger.warn("AI not configured, skipping tag generation", { url });
     return [];
   }
 
   try {
     logger.info("Generating AI tags", { url, hasTitle: !!title, hasDescription: !!description });
-    const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const context = [
       `URL: ${url}`,
@@ -39,12 +38,15 @@ export async function generateTags(
       .filter(Boolean)
       .join("\n");
 
-    const result = await model.generateContent([
-      TAGGING_PROMPT,
-      context,
-    ]);
+    const result = await client.chat.completions.create({
+      model: getChatModel(),
+      messages: [
+        { role: "system", content: TAGGING_PROMPT },
+        { role: "user", content: context },
+      ],
+    });
 
-    const text = result.response.text().trim();
+    const text = result.choices[0]?.message?.content?.trim();
     if (!text) return [];
 
     const cleaned = text
@@ -64,7 +66,7 @@ export async function generateTags(
     logger.info("AI tags generated successfully", { url, tags });
     return tags;
   } catch (error) {
-    logger.error("Gemini tag generation failed", {
+    logger.error("AI tag generation failed", {
       url,
       error: error instanceof Error ? error.message : String(error),
     });

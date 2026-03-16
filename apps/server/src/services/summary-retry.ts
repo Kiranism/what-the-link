@@ -3,7 +3,7 @@ import { db } from "@bookmark/db";
 import { and, eq, lt, or } from "drizzle-orm";
 import { generateSummary } from "./gemini-summarizer";
 import { generateTags } from "./gemini-tagger";
-import { isGeminiConfigured } from "./gemini-client";
+import { isAIConfigured } from "./ai-client";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
@@ -23,7 +23,7 @@ function isRateLimitError(error: unknown): boolean {
 }
 
 async function retryFailedSummaries(): Promise<void> {
-  if (!isGeminiConfigured()) return;
+  if (!isAIConfigured()) return;
 
   // Skip if we're rate limited
   if (Date.now() < rateLimitedUntil) {
@@ -74,6 +74,7 @@ async function retryFailedSummaries(): Promise<void> {
             summary,
             summaryStatus: "complete",
             summaryRetries: (bookmark.summaryRetries ?? 0) + 1,
+            embeddingStatus: "pending",
             updatedAt: new Date(),
           })
           .where(eq(bookmarks.id, bookmark.id));

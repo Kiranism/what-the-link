@@ -5,14 +5,46 @@ import { fetchMetadata } from "../services/metadata";
 import { normalizeUrl } from "../utils/url-extractor";
 import { generateSummary } from "../services/gemini-summarizer";
 import { generateTags } from "../services/gemini-tagger";
-import { isGeminiConfigured } from "../services/gemini-client";
+import { isAIConfigured } from "../services/ai-client";
 import { smartSearch } from "../services/smart-search";
+import { removeEmbeddingCacheEntry, updateEmbeddingCacheArchived, setEmbeddingCacheEntry } from "../services/embedding-cache";
+import { generateEmbedding, buildEmbeddingText, serializeEmbedding } from "../services/embedding-service";
 import { parseBookmarkHtml, importBookmarks, getImportStatus, clearImportStatus } from "../services/bookmark-import";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { logger } from "../utils/logger";
 
 export const bookmarksRouter = new Hono();
+
+/** Fire-and-forget: generate embedding for a bookmark and update DB + cache. */
+function generateEmbeddingForBookmark(bookmark: {
+  id: number;
+  url: string;
+  title: string | null;
+  tags: string[] | null;
+  summary: string | null;
+  description: string | null;
+  isArchived: boolean;
+}): void {
+  const text = buildEmbeddingText(bookmark);
+  generateEmbedding(text)
+    .then(async (embedding) => {
+      if (embedding) {
+        const blob = serializeEmbedding(embedding);
+        await db
+          .update(bookmarks)
+          .set({ embedding: blob, embeddingStatus: "complete", updatedAt: new Date() })
+          .where(eq(bookmarks.id, bookmark.id));
+        setEmbeddingCacheEntry(bookmark.id, embedding, bookmark.isArchived);
+      }
+    })
+    .catch((err) => {
+      logger.error("Inline embedding generation failed", {
+        id: bookmark.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+}
 
 // --- Static routes first (before /:id) ---
 
@@ -27,11 +59,11 @@ bookmarksRouter.get("/", async (c) => {
   const offset = Number(c.req.query("offset")) || 0;
 
   // Try smart search when search param exists and Gemini is configured
-  if (search?.trim() && isGeminiConfigured()) {
+  if (search?.trim() && isAIConfigured()) {
     try {
       const { orderedIds, searchMode } = await smartSearch(search.trim(), { archived });
 
-      if (searchMode === "smart" && orderedIds.length > 0) {
+      if ((searchMode === "smart" || searchMode === "semantic") && orderedIds.length > 0) {
         // Fetch the bookmarks in the reranked order
         const paginatedIds = orderedIds.slice(offset, offset + limit);
         if (paginatedIds.length === 0) {
@@ -193,9 +225,23 @@ bookmarksRouter.get("/import/status", async (c) => {
     enrichment[row.status] = row.count;
   }
 
+  const embeddingStats = await db
+    .select({
+      status: bookmarks.embeddingStatus,
+      count: sql<number>`count(*)`,
+    })
+    .from(bookmarks)
+    .groupBy(bookmarks.embeddingStatus);
+
+  const embeddingEnrichment: Record<string, number> = {};
+  for (const row of embeddingStats) {
+    embeddingEnrichment[row.status] = row.count;
+  }
+
   return c.json({
     import: importStatus,
     enrichment,
+    embeddingEnrichment,
   });
 });
 
@@ -219,6 +265,28 @@ bookmarksRouter.post("/retry-ai", async (c) => {
     .returning({ id: bookmarks.id });
 
   logger.info("Reset stuck bookmarks for AI retry", { count: result.length });
+  return c.json({ reset: result.length });
+});
+
+bookmarksRouter.post("/retry-embeddings", async (c) => {
+  const result = await db
+    .update(bookmarks)
+    .set({
+      embeddingStatus: "pending",
+      embeddingRetries: 0,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        or(
+          eq(bookmarks.embeddingStatus, "failed"),
+          eq(bookmarks.embeddingStatus, "skipped"),
+        ),
+      ),
+    )
+    .returning({ id: bookmarks.id });
+
+  logger.info("Reset stuck bookmarks for embedding retry", { count: result.length });
   return c.json({ reset: result.length });
 });
 
@@ -248,9 +316,11 @@ bookmarksRouter.post("/bulk", async (c) => {
   switch (body.action) {
     case "archive":
       await db.update(bookmarks).set({ isArchived: true, updatedAt: now }).where(inArray(bookmarks.id, ids));
+      for (const id of ids) updateEmbeddingCacheArchived(id, true);
       break;
     case "unarchive":
       await db.update(bookmarks).set({ isArchived: false, updatedAt: now }).where(inArray(bookmarks.id, ids));
+      for (const id of ids) updateEmbeddingCacheArchived(id, false);
       break;
 
     case "markRead":
@@ -258,6 +328,7 @@ bookmarksRouter.post("/bulk", async (c) => {
       break;
     case "delete":
       await db.delete(bookmarks).where(inArray(bookmarks.id, ids));
+      for (const id of ids) removeEmbeddingCacheEntry(id);
       break;
     case "addTags": {
       if (!Array.isArray(body.tags) || body.tags.length === 0) {
@@ -267,7 +338,7 @@ bookmarksRouter.post("/bulk", async (c) => {
       for (const row of rows) {
         const existing = Array.isArray(row.tags) ? row.tags : [];
         const merged = Array.from(new Set([...existing, ...body.tags!]));
-        await db.update(bookmarks).set({ tags: merged, updatedAt: now }).where(eq(bookmarks.id, row.id));
+        await db.update(bookmarks).set({ tags: merged, embeddingStatus: "pending", updatedAt: now }).where(eq(bookmarks.id, row.id));
       }
       break;
     }
@@ -301,7 +372,7 @@ bookmarksRouter.post("/", async (c) => {
   }
 
   const domain = new URL(url).hostname;
-  const geminiReady = isGeminiConfigured();
+  const geminiReady = isAIConfigured();
 
   const [created] = await db
     .insert(bookmarks)
@@ -328,8 +399,15 @@ bookmarksRouter.post("/", async (c) => {
         if (summary) {
           await db
             .update(bookmarks)
-            .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
+            .set({ summary, summaryStatus: "complete", embeddingStatus: "pending", updatedAt: new Date() })
             .where(eq(bookmarks.id, created.id));
+
+          // Re-generate embedding now that we have a summary
+          generateEmbeddingForBookmark({
+            ...created,
+            summary,
+            isArchived: false,
+          });
         } else {
           await db
             .update(bookmarks)
@@ -363,6 +441,15 @@ bookmarksRouter.post("/", async (c) => {
           });
         });
     }
+  }
+
+  // Generate an initial embedding from what we have now (title/tags/description).
+  // Will be regenerated after summary completes with richer text.
+  if (isAIConfigured() && created) {
+    generateEmbeddingForBookmark({
+      ...created,
+      isArchived: false,
+    });
   }
 
   return c.json(created!, 201);
@@ -409,6 +496,11 @@ bookmarksRouter.patch("/:id", async (c) => {
   }
   updates.updatedAt = new Date();
 
+  // Reset embedding if content fields changed
+  if ("title" in body || "description" in body || "tags" in body) {
+    (updates as Record<string, unknown>).embeddingStatus = "pending";
+  }
+
   const [updated] = await db
     .update(bookmarks)
     .set(updates)
@@ -418,6 +510,11 @@ bookmarksRouter.patch("/:id", async (c) => {
   if (!updated) {
     return c.json({ error: "Bookmark not found" }, 404);
   }
+
+  if ("isArchived" in body) {
+    updateEmbeddingCacheArchived(id, Boolean(body.isArchived));
+  }
+
   return c.json(updated);
 });
 
@@ -438,7 +535,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
   }
 
   const metadata = await fetchMetadata(bookmark.url);
-  const geminiReady = isGeminiConfigured();
+  const geminiReady = isAIConfigured();
 
   const [updated] = await db
     .update(bookmarks)
@@ -449,6 +546,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
       favicon: metadata.favicon ?? bookmark.favicon,
       metadataStatus: metadata.success ? "complete" : "failed",
       summaryStatus: geminiReady ? "pending" : bookmark.summaryStatus,
+      embeddingStatus: "pending",
       updatedAt: new Date(),
     })
     .where(eq(bookmarks.id, id))
@@ -465,8 +563,13 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
         if (summary) {
           await db
             .update(bookmarks)
-            .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
+            .set({ summary, summaryStatus: "complete", embeddingStatus: "pending", updatedAt: new Date() })
             .where(eq(bookmarks.id, id));
+
+          generateEmbeddingForBookmark({
+            ...updated,
+            summary,
+          });
         } else {
           await db
             .update(bookmarks)
@@ -491,5 +594,6 @@ bookmarksRouter.delete("/:id", async (c) => {
     return c.json({ error: "Invalid ID" }, 400);
   }
   await db.delete(bookmarks).where(eq(bookmarks.id, id));
+  removeEmbeddingCacheEntry(id);
   return c.json({ success: true });
 });

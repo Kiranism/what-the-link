@@ -1,4 +1,5 @@
 import {
+  blob,
   index,
   integer,
   sqliteTable,
@@ -37,6 +38,9 @@ export const bookmarks = sqliteTable(
     summary: text("summary"),
     summaryStatus: text("summary_status").notNull().default("skipped"),
     summaryRetries: integer("summary_retries").notNull().default(0),
+    embedding: blob("embedding"),
+    embeddingStatus: text("embedding_status").notNull().default("pending"),
+    embeddingRetries: integer("embedding_retries").notNull().default(0),
   },
   (table) => ({
     createdAtIdx: index("idx_bookmarks_created_at").on(table.createdAt),

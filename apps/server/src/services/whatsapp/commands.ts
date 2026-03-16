@@ -1,7 +1,7 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
-import { smartSearch, isGeminiConfigured } from "../smart-search";
+import { smartSearch, isAIConfigured } from "../smart-search";
 import { logger } from "../../utils/logger";
 import type { WASocket } from "@whiskeysockets/baileys";
 
@@ -96,14 +96,14 @@ export async function handleSearchCommand(
   try {
     let results: any[] = [];
     let count = 0;
-    let searchMode: "smart" | "basic" = "basic";
+    let searchMode: "smart" | "basic" | "semantic" = "basic";
 
-    if (isGeminiConfigured()) {
+    if (isAIConfigured()) {
       try {
         const smartResult = await smartSearch(trimmed, { archived: false });
         searchMode = smartResult.searchMode;
 
-        if (smartResult.searchMode === "smart" && smartResult.orderedIds.length > 0) {
+        if ((smartResult.searchMode === "smart" || smartResult.searchMode === "semantic") && smartResult.orderedIds.length > 0) {
           const topIds = smartResult.orderedIds.slice(0, MAX_SEARCH_RESULTS);
           count = smartResult.orderedIds.length;
 
@@ -167,7 +167,7 @@ async function sendSearchResults(
   results: any[],
   totalCount: number,
   quotedMsg: any,
-  searchMode?: "smart" | "basic",
+  searchMode?: "smart" | "basic" | "semantic",
 ): Promise<void> {
   if (results.length === 0) {
     await sock.sendMessage(remoteJid, {
@@ -176,7 +176,7 @@ async function sendSearchResults(
     return;
   }
 
-  const modeLabel = searchMode === "smart" ? " ✨" : "";
+  const modeLabel = searchMode === "smart" || searchMode === "semantic" ? " ✨" : "";
   const lines = [`*Search results for "${query}":*${modeLabel}\n`];
   for (let i = 0; i < results.length; i++) {
     const b = results[i]!;

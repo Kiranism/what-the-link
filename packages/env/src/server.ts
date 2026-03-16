@@ -24,8 +24,12 @@ export const env = createEnv({
     WA_AUTH_DIR: z.string().optional(),
     /** When set, only save bookmarks from this WhatsApp group (use group JID, e.g. 120363123456789012@g.us). Leave unset to allow all chats. */
     WA_ALLOWED_GROUP_JID: z.string().optional(),
-    /** Google Gemini API key for AI-powered link extraction from text and images. */
-    GEMINI_API_KEY: z.string().optional(),
+    /** OpenRouter API key for AI-powered features (summaries, tags, embeddings). */
+    OPENROUTER_API_KEY: z.string().optional(),
+    /** OpenRouter chat model (default: google/gemini-2.5-flash-lite). */
+    OPENROUTER_CHAT_MODEL: z.string().optional(),
+    /** OpenRouter embedding model (default: google/gemini-embedding-001). */
+    OPENROUTER_EMBEDDING_MODEL: z.string().optional(),
   },
   runtimeEnv: {
     ...process.env,

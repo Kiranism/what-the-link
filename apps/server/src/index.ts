@@ -5,12 +5,17 @@ import { ensureAppSettingsTable, getAppSettings } from "./services/settings";
 import { initWhatsApp } from "./services/whatsapp";
 import { startMetadataRetryJob } from "./services/metadata-retry";
 import { startSummaryRetryJob } from "./services/summary-retry";
+import { loadEmbeddingCache } from "./services/embedding-cache";
+import { startEmbeddingRetryJob } from "./services/embedding-retry";
 import { logger } from "./utils/logger";
 
 async function ensureNewColumns(): Promise<void> {
   const cols = [
     { name: "metadata_status", sql: "ALTER TABLE bookmarks ADD COLUMN metadata_status TEXT NOT NULL DEFAULT 'complete'" },
     { name: "metadata_retries", sql: "ALTER TABLE bookmarks ADD COLUMN metadata_retries INTEGER NOT NULL DEFAULT 0" },
+    { name: "embedding", sql: "ALTER TABLE bookmarks ADD COLUMN embedding BLOB" },
+    { name: "embedding_status", sql: "ALTER TABLE bookmarks ADD COLUMN embedding_status TEXT NOT NULL DEFAULT 'pending'" },
+    { name: "embedding_retries", sql: "ALTER TABLE bookmarks ADD COLUMN embedding_retries INTEGER NOT NULL DEFAULT 0" },
   ];
   for (const col of cols) {
     try {
@@ -80,8 +85,11 @@ async function main() {
   await initWhatsApp();
   logger.info("WhatsApp connector initialized");
 
+  await loadEmbeddingCache();
+
   startMetadataRetryJob();
   startSummaryRetryJob();
+  startEmbeddingRetryJob();
 
   startListening(PORT);
 }

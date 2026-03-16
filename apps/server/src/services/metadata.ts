@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { getClient } from "./gemini-client";
+import { getAIClient, getChatModel } from "./ai-client";
 import { logger } from "../utils/logger";
 
 export interface Metadata {
@@ -117,7 +117,7 @@ export async function fetchMetadata(url: string): Promise<Metadata> {
     });
   }
 
-  // Fallback: use Gemini to infer metadata from the URL itself
+  // Fallback: use AI to infer metadata from the URL itself
   logger.info("Falling through to AI metadata inference", { url });
   const aiMeta = await inferMetadataFromUrl(url);
   if (aiMeta) {
@@ -196,21 +196,25 @@ Extract as much context as possible from filters, categories, and path structure
 Return ONLY the JSON object, no other text.`;
 
 async function inferMetadataFromUrl(url: string): Promise<AIMetadata | null> {
-  const client = getClient();
+  const client = getAIClient();
   if (!client) {
-    logger.warn("Gemini not configured, cannot infer metadata from URL", { url });
+    logger.warn("AI not configured, cannot infer metadata from URL", { url });
     return null;
   }
 
   try {
-    logger.info("Calling Gemini for AI metadata inference", { url });
-    const model = client.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent([
-      AI_METADATA_PROMPT,
-      `URL: ${url}`,
-    ]);
+    logger.info("Calling AI for metadata inference", { url });
+    const result = await client.chat.completions.create({
+      model: getChatModel(),
+      messages: [
+        { role: "system", content: AI_METADATA_PROMPT },
+        { role: "user", content: `URL: ${url}` },
+      ],
+    });
 
-    const text = result.response.text().trim();
+    const text = result.choices[0]?.message?.content?.trim();
+    if (!text) return null;
+
     const cleaned = text
       .replace(/```json\s*/gi, "")
       .replace(/```\s*/g, "")

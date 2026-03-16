@@ -2,7 +2,7 @@ import * as cheerio from "cheerio";
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { eq } from "drizzle-orm";
-import { isGeminiConfigured } from "./gemini-client";
+import { isAIConfigured } from "./ai-client";
 import { logger } from "../utils/logger";
 
 interface ParsedBookmark {
@@ -104,7 +104,7 @@ export async function importBookmarks(
   parsed: ParsedBookmark[],
 ): Promise<ImportResult> {
   const result: ImportResult = { total: parsed.length, imported: 0, duplicates: 0, failed: 0 };
-  const geminiReady = isGeminiConfigured();
+  const geminiReady = isAIConfigured();
 
   currentImport = {
     state: "importing",

@@ -8,7 +8,7 @@ import { extractURLs, extractHashtags } from "../../utils/url-extractor";
 import {
   extractLinksFromText,
   extractLinksFromImage,
-  isGeminiConfigured,
+  isAIConfigured,
 } from "../gemini-link-extractor";
 import { generateSummary } from "../gemini-summarizer";
 import { generateTags } from "../gemini-tagger";
@@ -254,7 +254,7 @@ export async function initWhatsApp(): Promise<void> {
       }
 
       // 2. If regex found nothing in text, try Gemini on text (catches partial URLs)
-      if (urls.length === 0 && text && isGeminiConfigured()) {
+      if (urls.length === 0 && text && isAIConfigured()) {
         logger.info("No regex URLs found, trying Gemini text extraction");
         urls = await extractLinksFromText(text);
         tags = extractHashtags(text);
@@ -262,7 +262,7 @@ export async function initWhatsApp(): Promise<void> {
       }
 
       // 3. If message has an image, try Gemini vision (screenshots, photos)
-      if (hasImage && isGeminiConfigured()) {
+      if (hasImage && isAIConfigured()) {
         try {
           const buffer = await downloadMediaMessage(msg, "buffer", {});
           const imageBuffer = Buffer.isBuffer(buffer)
@@ -319,7 +319,7 @@ export async function initWhatsApp(): Promise<void> {
 
           const metadata = await fetchMetadata(url);
 
-          const geminiReady = isGeminiConfigured();
+          const geminiReady = isAIConfigured();
 
           const [inserted] = await db.insert(bookmarks).values({
             url,

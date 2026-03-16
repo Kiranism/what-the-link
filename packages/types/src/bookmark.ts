@@ -16,6 +16,7 @@ export interface Bookmark {
   whatsappMessageId: string | null;
   summary: string | null;
   summaryStatus: string;
+  embeddingStatus: string;
 }
 
 export interface BookmarkListResponse {
@@ -23,5 +24,5 @@ export interface BookmarkListResponse {
   total: number;
   limit: number;
   offset: number;
-  searchMode?: "smart" | "basic";
+  searchMode?: "smart" | "basic" | "semantic";
 }

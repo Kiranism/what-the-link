@@ -315,7 +315,7 @@ function HomePage() {
           className="text-sm sm:text-base h-11 sm:h-14"
         />
         <InputGroupAddon align="inline-end">
-          {data?.searchMode === "smart" && deferredSearch && (
+          {(data?.searchMode === "smart" || data?.searchMode === "semantic") && deferredSearch && (
             <span className="inline-flex items-center gap-1 text-xs text-primary mr-2" title="AI-powered search">
               <SparklesIcon className="size-3.5" />
               <span className="hidden sm:inline">Smart</span>
