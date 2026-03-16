@@ -135,13 +135,17 @@ export function WhatsAppGroupSettings() {
             onClick={() => refreshGroupsMutation.mutate()}
             disabled={refreshGroupsMutation.isPending}
           >
-            <RefreshCwIcon className={refreshGroupsMutation.isPending ? "animate-spin" : ""} data-icon="inline-start" />
+            <RefreshCwIcon
+              className={refreshGroupsMutation.isPending ? "animate-spin" : ""}
+              data-icon="inline-start"
+            />
             Refresh groups
           </Button>
         </div>
         <CardDescription>
-          Search known groups locally and save a single group filter.
-          Press {"\u201c"}Refresh groups{"\u201d"} to re-fetch the latest list from WhatsApp.
+          Search known groups locally and save a single group filter. Press{" "}
+          {"\u201c"}Refresh groups{"\u201d"} to re-fetch the latest list from
+          WhatsApp.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -208,7 +212,7 @@ export function WhatsAppGroupSettings() {
                       {mutation.isPending ? (
                         <Spinner data-icon="inline-start" />
                       ) : null}
-                      Save filter
+                      Save
                     </Button>
                   </div>
                 </>
@@ -217,8 +221,7 @@ export function WhatsAppGroupSettings() {
                   <InfoIcon />
                   <AlertTitle>No groups available</AlertTitle>
                   <AlertDescription>
-                    Sync WhatsApp groups first, then pick one here and save
-                    it.
+                    Sync WhatsApp groups first, then pick one here and save it.
                   </AlertDescription>
                 </Alert>
               )}
