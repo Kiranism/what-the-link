@@ -5,11 +5,17 @@ import { fetchMetadata } from "../metadata";
 import { getCachedWaAllowedGroupJid } from "../settings";
 import { logger } from "../../utils/logger";
 import { extractURLs, extractHashtags } from "../../utils/url-extractor";
+import {
+  extractLinksFromText,
+  extractLinksFromImage,
+  isGeminiConfigured,
+} from "../gemini-link-extractor";
 import { env } from "@bookmark/env/server";
 import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
+  downloadMediaMessage,
   type WASocket,
 } from "@whiskeysockets/baileys";
 import { Boom } from "@hapi/boom";
@@ -222,12 +228,11 @@ export async function initWhatsApp(): Promise<void> {
         (msg.message as any)?.imageMessage?.caption ??
         "";
 
-      if (!text) continue;
-
       const remoteJid = msg.key.remoteJid;
+      const hasImage = !!(msg.message as any)?.imageMessage;
 
       // --- Question query: messages starting with "?" ---
-      if (remoteJid && sock) {
+      if (text && remoteJid && sock) {
         const questionQuery = extractQuestionQuery(text);
         if (questionQuery) {
           await handleSearchCommand(sock, remoteJid, questionQuery, msg);
@@ -235,17 +240,66 @@ export async function initWhatsApp(): Promise<void> {
         }
       }
 
-      // --- URL extraction with hashtag tagging ---
-      const urls = extractURLs(text);
+      // --- Collect URLs from all sources ---
+      let urls: string[] = [];
+      let tags: string[] = [];
+      let source: "regex" | "gemini-text" | "gemini-image" = "regex";
+
+      // 1. Try regex extraction from text first (fast, free)
+      if (text) {
+        urls = extractURLs(text);
+        tags = extractHashtags(text);
+      }
+
+      // 2. If regex found nothing in text, try Gemini on text (catches partial URLs)
+      if (urls.length === 0 && text && isGeminiConfigured()) {
+        logger.info("No regex URLs found, trying Gemini text extraction");
+        urls = await extractLinksFromText(text);
+        tags = extractHashtags(text);
+        if (urls.length > 0) source = "gemini-text";
+      }
+
+      // 3. If message has an image, try Gemini vision (screenshots, photos)
+      if (hasImage && isGeminiConfigured()) {
+        try {
+          const buffer = await downloadMediaMessage(msg, "buffer", {});
+          const imageBuffer = Buffer.isBuffer(buffer)
+            ? buffer
+            : Buffer.from(buffer as Uint8Array);
+          const mimetype =
+            (msg.message as any)?.imageMessage?.mimetype ?? "image/jpeg";
+
+          logger.info("Extracting links from image via Gemini");
+          const imageUrls = await extractLinksFromImage(imageBuffer, mimetype);
+
+          if (imageUrls.length > 0) {
+            // Merge with any text URLs (deduplicate)
+            const existing = new Set(urls);
+            for (const u of imageUrls) {
+              if (!existing.has(u)) urls.push(u);
+            }
+            if (source === "regex" && imageUrls.length > 0)
+              source = "gemini-image";
+          }
+        } catch (error) {
+          logger.error("Failed to download/process image", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       if (urls.length === 0) continue;
 
-      const tags = extractHashtags(text);
+      // --- Save each extracted URL as a bookmark ---
+      let savedCount = 0;
+      let duplicateCount = 0;
 
       for (const url of urls) {
         try {
           logger.info("Processing URL from WhatsApp", {
             url,
             tags,
+            source,
             chatJid: (remoteJid ?? "").split(":")[0],
           });
 
@@ -257,15 +311,7 @@ export async function initWhatsApp(): Promise<void> {
 
           if (existing) {
             logger.info("Bookmark already exists", { url });
-            if (remoteJid && sock) {
-              try {
-                await sock.sendMessage(remoteJid, {
-                  react: { text: "⚠️", key: msg.key },
-                });
-              } catch (reactErr) {
-                logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
-              }
-            }
+            duplicateCount++;
             continue;
           }
 
@@ -284,29 +330,34 @@ export async function initWhatsApp(): Promise<void> {
             metadataStatus: metadata.success ? "complete" : "failed",
           });
 
-          logger.info("Bookmark saved", { url, title: metadata.title, tags });
-
-          if (remoteJid && sock) {
-            try {
-              await sock.sendMessage(remoteJid, {
-                react: { text: "🔖", key: msg.key },
-              });
-            } catch (reactErr) {
-              logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
-            }
-          }
+          logger.info("Bookmark saved", { url, title: metadata.title, tags, source });
+          savedCount++;
         } catch (error) {
           logger.error("Failed to save bookmark", { url, error });
+        }
+      }
 
-          if (remoteJid && sock) {
-            try {
-              await sock.sendMessage(remoteJid, {
-                react: { text: "❌", key: msg.key },
-              });
-            } catch (reactErr) {
-              logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
-            }
+      // --- React to the message based on results ---
+      if (remoteJid && sock) {
+        try {
+          let reaction = "❌";
+          if (savedCount > 0) reaction = "🔖";
+          else if (duplicateCount > 0) reaction = "⚠️";
+
+          await sock.sendMessage(remoteJid, {
+            react: { text: reaction, key: msg.key },
+          });
+
+          // If multiple links saved from one message, send a summary
+          if (savedCount > 1) {
+            await sock.sendMessage(
+              remoteJid,
+              { text: `📎 Saved ${savedCount} links from ${source === "gemini-image" ? "image" : "message"}` },
+              { quoted: msg },
+            );
           }
+        } catch (reactErr) {
+          logger.error("Failed to send reaction", { reactErr, msgKey: msg.key });
         }
       }
     }
