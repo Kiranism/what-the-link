@@ -467,9 +467,9 @@ bookmarksRouter.post("/", async (c) => {
     }
   }
 
-  // Generate an initial embedding from what we have now (title/tags/description).
-  // Will be regenerated after summary completes with richer text.
-  if (isAIConfigured() && created) {
+  // If AI is not configured, no summary will come — embed from title/tags now.
+  // Otherwise, the summary chain above will trigger embedding after summary completes.
+  if (!aiReady && created) {
     generateEmbeddingForBookmark({
       ...created,
       isArchived: false,

@@ -176,12 +176,8 @@ export function startEmbeddingRetryJob(): void {
     });
   }, RETRY_INTERVAL_MS);
 
-  // Process everything immediately on startup
-  processAllPendingEmbeddings().catch((err) => {
-    logger.error("Initial embedding processing failed", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
+  // NOTE: no immediate run here — the summary job chains into embeddings on startup.
+  // The fallback interval catches anything that slips through.
 
   logger.info("Embedding retry job started", { intervalMs: RETRY_INTERVAL_MS });
 }

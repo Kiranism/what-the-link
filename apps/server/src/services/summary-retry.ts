@@ -4,6 +4,7 @@ import { and, eq, lt, or, sql } from "drizzle-orm";
 import { generateSummary } from "./gemini-summarizer";
 import { generateTags } from "./gemini-tagger";
 import { isAIConfigured } from "./ai-client";
+import { processAllPendingEmbeddings } from "./embedding-retry";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
@@ -195,12 +196,14 @@ export function startSummaryRetryJob(): void {
     });
   }, RETRY_INTERVAL_MS);
 
-  // Process everything immediately on startup
-  processAllPendingSummaries().catch((err) => {
-    logger.error("Initial summary processing failed", {
-      error: err instanceof Error ? err.message : String(err),
+  // Process everything immediately on startup, then chain into embeddings
+  processAllPendingSummaries()
+    .then(() => processAllPendingEmbeddings())
+    .catch((err) => {
+      logger.error("Initial AI processing failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
-  });
 
   logger.info("Summary retry job started", { intervalMs: RETRY_INTERVAL_MS });
 }
