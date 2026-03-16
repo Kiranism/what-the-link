@@ -245,7 +245,7 @@ export async function initWhatsApp(): Promise<void> {
       // --- Collect URLs from all sources ---
       let urls: string[] = [];
       let tags: string[] = [];
-      let source: "regex" | "gemini-text" | "gemini-image" = "regex";
+      let source: "regex" | "ai-text" | "ai-image" = "regex";
 
       // 1. Try regex extraction from text first (fast, free)
       if (text) {
@@ -253,15 +253,15 @@ export async function initWhatsApp(): Promise<void> {
         tags = extractHashtags(text);
       }
 
-      // 2. If regex found nothing in text, try Gemini on text (catches partial URLs)
+      // 2. If regex found nothing in text, try AI on text (catches partial URLs)
       if (urls.length === 0 && text && isAIConfigured()) {
-        logger.info("No regex URLs found, trying Gemini text extraction");
+        logger.info("No regex URLs found, trying AI text extraction");
         urls = await extractLinksFromText(text);
         tags = extractHashtags(text);
-        if (urls.length > 0) source = "gemini-text";
+        if (urls.length > 0) source = "ai-text";
       }
 
-      // 3. If message has an image, try Gemini vision (screenshots, photos)
+      // 3. If message has an image, try AI vision (screenshots, photos)
       if (hasImage && isAIConfigured()) {
         try {
           const buffer = await downloadMediaMessage(msg, "buffer", {});
@@ -271,7 +271,7 @@ export async function initWhatsApp(): Promise<void> {
           const mimetype =
             (msg.message as any)?.imageMessage?.mimetype ?? "image/jpeg";
 
-          logger.info("Extracting links from image via Gemini");
+          logger.info("Extracting links from image via AI");
           const imageUrls = await extractLinksFromImage(imageBuffer, mimetype);
 
           if (imageUrls.length > 0) {
@@ -281,7 +281,7 @@ export async function initWhatsApp(): Promise<void> {
               if (!existing.has(u)) urls.push(u);
             }
             if (source === "regex" && imageUrls.length > 0)
-              source = "gemini-image";
+              source = "ai-image";
           }
         } catch (error) {
           logger.error("Failed to download/process image", {
@@ -319,7 +319,7 @@ export async function initWhatsApp(): Promise<void> {
 
           const metadata = await fetchMetadata(url);
 
-          const geminiReady = isAIConfigured();
+          const aiReady = isAIConfigured();
 
           const [inserted] = await db.insert(bookmarks).values({
             url,
@@ -332,7 +332,7 @@ export async function initWhatsApp(): Promise<void> {
             source: "whatsapp",
             whatsappMessageId: msg.key.id,
             metadataStatus: metadata.success ? "complete" : "failed",
-            summaryStatus: geminiReady ? "pending" : "skipped",
+            summaryStatus: aiReady ? "pending" : "skipped",
           }).returning();
 
           logger.info("Bookmark saved", { url, title: metadata.title, tags, source });
@@ -341,13 +341,13 @@ export async function initWhatsApp(): Promise<void> {
           // Fire-and-forget: generate AI summary + auto-tags
           logger.info("AI processing check", {
             url,
-            geminiReady,
+            aiReady,
             insertedId: inserted?.id,
             metadataSuccess: metadata.success,
             metadataTitle: metadata.title ?? "(none)",
           });
 
-          if (geminiReady && inserted) {
+          if (aiReady && inserted) {
             const metaTitle = metadata.title ?? null;
             const metaDesc = metadata.description ?? null;
 
@@ -413,7 +413,7 @@ export async function initWhatsApp(): Promise<void> {
           if (savedCount > 1) {
             await sock.sendMessage(
               remoteJid,
-              { text: `📎 Saved ${savedCount} links from ${source === "gemini-image" ? "image" : "message"}` },
+              { text: `📎 Saved ${savedCount} links from ${source === "ai-image" ? "image" : "message"}` },
               { quoted: msg },
             );
           }

@@ -104,7 +104,7 @@ export async function importBookmarks(
   parsed: ParsedBookmark[],
 ): Promise<ImportResult> {
   const result: ImportResult = { total: parsed.length, imported: 0, duplicates: 0, failed: 0 };
-  const geminiReady = isAIConfigured();
+  const aiReady = isAIConfigured();
 
   currentImport = {
     state: "importing",
@@ -150,7 +150,7 @@ export async function importBookmarks(
         tags: folderTag,
         source: "import",
         metadataStatus: "failed",
-        summaryStatus: geminiReady ? "pending" : "skipped",
+        summaryStatus: aiReady ? "pending" : "skipped",
         createdAt,
       });
 

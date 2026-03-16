@@ -58,7 +58,7 @@ bookmarksRouter.get("/", async (c) => {
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
   const offset = Number(c.req.query("offset")) || 0;
 
-  // Try smart search when search param exists and Gemini is configured
+  // Try smart search when search param exists and AI is configured
   if (search?.trim() && isAIConfigured()) {
     try {
       const { orderedIds, searchMode } = await smartSearch(search.trim(), { archived });
@@ -372,7 +372,7 @@ bookmarksRouter.post("/", async (c) => {
   }
 
   const domain = new URL(url).hostname;
-  const geminiReady = isAIConfigured();
+  const aiReady = isAIConfigured();
 
   const [created] = await db
     .insert(bookmarks)
@@ -385,12 +385,12 @@ bookmarksRouter.post("/", async (c) => {
       domain,
       tags: Array.isArray(body.tags) ? body.tags : [],
       source: "manual",
-      summaryStatus: geminiReady ? "pending" : "skipped",
+      summaryStatus: aiReady ? "pending" : "skipped",
     })
     .returning();
 
   // Fire-and-forget: generate AI summary + auto-tags
-  if (geminiReady && created) {
+  if (aiReady && created) {
     const metaTitle = body.title ?? null;
     const metaDesc = body.description ?? null;
 
@@ -535,7 +535,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
   }
 
   const metadata = await fetchMetadata(bookmark.url);
-  const geminiReady = isAIConfigured();
+  const aiReady = isAIConfigured();
 
   const [updated] = await db
     .update(bookmarks)
@@ -545,7 +545,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
       image: metadata.image ?? bookmark.image,
       favicon: metadata.favicon ?? bookmark.favicon,
       metadataStatus: metadata.success ? "complete" : "failed",
-      summaryStatus: geminiReady ? "pending" : bookmark.summaryStatus,
+      summaryStatus: aiReady ? "pending" : bookmark.summaryStatus,
       embeddingStatus: "pending",
       updatedAt: new Date(),
     })
@@ -553,7 +553,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
     .returning();
 
   // Fire-and-forget: regenerate AI summary
-  if (geminiReady && updated) {
+  if (aiReady && updated) {
     generateSummary(
       bookmark.url,
       metadata.title ?? bookmark.title,
