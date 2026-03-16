@@ -8,14 +8,18 @@ CREATE TABLE `bookmarks` (
 	`domain` text NOT NULL,
 	`tags` text DEFAULT '[]',
 	`is_archived` integer DEFAULT false NOT NULL,
-
-	`is_read` integer DEFAULT false NOT NULL,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`source` text DEFAULT 'whatsapp' NOT NULL,
 	`whatsapp_message_id` text,
 	`metadata_status` text DEFAULT 'complete' NOT NULL,
-	`metadata_retries` integer DEFAULT 0 NOT NULL
+	`metadata_retries` integer DEFAULT 0 NOT NULL,
+	`summary` text,
+	`summary_status` text DEFAULT 'skipped' NOT NULL,
+	`summary_retries` integer DEFAULT 0 NOT NULL,
+	`embedding` blob,
+	`embedding_status` text DEFAULT 'pending' NOT NULL,
+	`embedding_retries` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE `tags` (
@@ -38,5 +42,4 @@ CREATE TABLE `app_settings` (
 --> statement-breakpoint
 CREATE INDEX `idx_bookmarks_created_at` ON `bookmarks` (`created_at`);--> statement-breakpoint
 CREATE INDEX `idx_bookmarks_domain` ON `bookmarks` (`domain`);--> statement-breakpoint
-
 CREATE INDEX `idx_bookmarks_archived` ON `bookmarks` (`is_archived`);

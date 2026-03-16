@@ -1,7 +1,7 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "a876176a-9518-4561-bd20-467bc25172b3",
+  "id": "370849d4-6022-4e38-ae45-9ae834069369",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -116,16 +116,6 @@
       "type": "integer",
       "notNull": true,
       "autoincrement": false,
-      "default": "false",
-      "generated": null,
-      "name": "is_read",
-      "entityType": "columns",
-      "table": "bookmarks"
-    },
-    {
-      "type": "integer",
-      "notNull": true,
-      "autoincrement": false,
       "default": "(unixepoch())",
       "generated": null,
       "name": "created_at",
@@ -179,6 +169,66 @@
       "default": "0",
       "generated": null,
       "name": "metadata_retries",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "summary",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'skipped'",
+      "generated": null,
+      "name": "summary_status",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "summary_retries",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "blob",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "embedding",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'pending'",
+      "generated": null,
+      "name": "embedding_status",
+      "entityType": "columns",
+      "table": "bookmarks"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "embedding_retries",
       "entityType": "columns",
       "table": "bookmarks"
     },
