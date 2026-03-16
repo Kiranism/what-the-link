@@ -192,7 +192,7 @@ function DataGridContainer({
       data-slot="data-grid"
       className={cn(
         "w-full overflow-hidden",
-        border && "border-border rounded-none border",
+        border && "border-border rounded-xl border",
         className,
       )}
     >
