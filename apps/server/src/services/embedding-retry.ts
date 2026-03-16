@@ -11,9 +11,9 @@ import { setEmbeddingCacheEntry } from "./embedding-cache";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
-// Embedding API has 1,500 req/day free tier — much more generous than generative
-const BATCH_SIZE = 20;
-const RETRY_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+// OpenRouter has no strict rate limit — process aggressively for fast catch-up
+const BATCH_SIZE = 50;
+const RETRY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 let intervalId: ReturnType<typeof setInterval> | null = null;
 let rateLimitedUntil = 0;
