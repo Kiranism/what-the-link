@@ -17,6 +17,7 @@
     "cheerio": "^1.0.0",
     "dotenv": "^17.2.2",
     "hono": "^4.8.2",
+    "link-preview-js": "^3.2.0",
     "node-cron": "^4.2.1",
     "openai": "^6.29.0",
     "qrcode": "^1.5.4",
