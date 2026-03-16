@@ -292,7 +292,7 @@ function HomePage() {
         </InputGroupAddon>
         <InputGroupInput
           aria-label="Search bookmarks"
-          placeholder="Search bookmarks…"
+          placeholder="Search by meaning, tag, or keyword…"
           type="search"
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
