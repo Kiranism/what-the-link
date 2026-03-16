@@ -333,7 +333,7 @@ function HomePage() {
 
       {/* Tags / Collections bar */}
       {tagsList.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           <TagIcon className="size-4 text-muted-foreground shrink-0" />
           <div className="flex gap-1.5">
             {tagsList.map(({ tag, count }) => (

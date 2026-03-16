@@ -2,12 +2,9 @@ import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { getSocket } from "./whatsapp/connection";
-import { getCachedWaAllowedGroupJid } from "./settings";
+import { getCachedWaAllowedGroupJid, getCachedDigestEnabled, getCachedDigestHour } from "./settings";
 import { env } from "@bookmark/env/server";
 import { logger } from "../utils/logger";
-
-/** Hour of day (0-23) to send the digest. Default: 20 (8 PM). */
-const DIGEST_HOUR = Number(process.env.DIGEST_HOUR) || 20;
 
 /** Interval handle so we can stop the job. */
 let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -17,7 +14,7 @@ let lastDigestDate: string | null = null;
 
 export function startDailyDigest(): void {
   if (intervalId) return;
-  logger.info("Daily digest job started", { digestHour: DIGEST_HOUR });
+  logger.info("Daily digest job started");
   // Check every minute
   intervalId = setInterval(() => {
     checkAndSendDigest().catch((err) => {
@@ -40,8 +37,11 @@ async function checkAndSendDigest(): Promise<void> {
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
+  // Check if digest is enabled
+  if (!getCachedDigestEnabled()) return;
+
   // Only fire at the configured hour
-  if (now.getHours() !== DIGEST_HOUR) return;
+  if (now.getHours() !== getCachedDigestHour()) return;
 
   // Already sent today
   if (lastDigestDate === todayStr) return;

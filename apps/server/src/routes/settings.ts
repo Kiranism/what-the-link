@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { getWhatsAppGroups, refreshWhatsAppGroups } from "../services/whatsapp";
-import { getAppSettings, setWaAllowedGroupJid } from "../services/settings";
+import { getAppSettings, setWaAllowedGroupJid, setDigestEnabled, setDigestHour } from "../services/settings";
 
 export const settingsRouter = new Hono();
 
@@ -20,6 +20,14 @@ settingsRouter.patch("/", async (c) => {
 
   if (waAllowedGroupJid !== undefined) {
     await setWaAllowedGroupJid(waAllowedGroupJid);
+  }
+
+  if (typeof body.digestEnabled === "boolean") {
+    await setDigestEnabled(body.digestEnabled);
+  }
+
+  if (typeof body.digestHour === "number") {
+    await setDigestHour(body.digestHour);
   }
 
   const settings = await getAppSettings();

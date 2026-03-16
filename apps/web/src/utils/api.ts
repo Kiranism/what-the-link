@@ -202,6 +202,8 @@ export async function getWhatsAppQR(): Promise<{
 
 export interface AppSettings {
   waAllowedGroupJid: string | null;
+  digestEnabled: boolean;
+  digestHour: number;
 }
 
 export async function fetchSettings(): Promise<AppSettings> {
