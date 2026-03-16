@@ -43,7 +43,7 @@ export async function smartSearch(
 
     const results = searchEmbeddings(queryEmbedding, {
       limit: 50,
-      threshold: 0.3,
+      threshold: 0.55,
       archived,
     });
 

@@ -80,7 +80,7 @@ export function searchEmbeddings(
   opts: { limit?: number; threshold?: number; archived?: boolean } = {},
 ): { id: number; score: number }[] {
   const limit = opts.limit ?? 50;
-  const threshold = opts.threshold ?? 0.3;
+  const threshold = opts.threshold ?? 0.55;
   const archived = opts.archived ?? false;
 
   const results: { id: number; score: number }[] = [];

@@ -15,8 +15,8 @@ let lastDigestDate: string | null = null;
 export function startDailyDigest(): void {
   if (task) return;
 
-  // Check every minute at :00 seconds — hour is dynamic from DB settings
-  task = schedule("* * * * *", () => {
+  // Check once per hour at :00 — hour is dynamic from DB settings
+  task = schedule("0 * * * *", () => {
     checkAndSendDigest().catch((err) => {
       logger.error("Daily digest check failed", {
         error: err instanceof Error ? err.message : String(err),
@@ -44,9 +44,6 @@ async function checkAndSendDigest(): Promise<void> {
 
   // Only fire at the configured hour
   if (now.getHours() !== getCachedDigestHour()) return;
-
-  // Only fire in the first minute of the hour to avoid sending 60 times
-  if (now.getMinutes() !== 0) return;
 
   // Already sent today
   if (lastDigestDate === todayStr) return;
