@@ -11,6 +11,7 @@ import {
 import { WhatsAppConnectionSettings } from "../components/settings/WhatsAppConnectionSettings";
 import { WhatsAppGroupSettings } from "../components/settings/WhatsAppGroupSettings";
 import { WhatsAppCommandsInfo } from "../components/settings/WhatsAppCommandsInfo";
+import { ImportBookmarks } from "../components/settings/ImportBookmarks";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -38,6 +39,7 @@ function SettingsPage() {
         <WhatsAppGroupSettings />
       </div>
       <WhatsAppCommandsInfo />
+      <ImportBookmarks />
     </div>
   );
 }

@@ -110,6 +110,29 @@ export async function bulkUpdateBookmarks(
 }
 
 
+export interface ImportResult {
+  total: number;
+  imported: number;
+  duplicates: number;
+  failed: number;
+}
+
+export async function importBookmarks(file: File): Promise<ImportResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await fetch(`${API_BASE}/bookmarks/import`, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error((data as { error?: string }).error ?? "Import failed");
+  }
+  return res.json();
+}
+
 export async function refreshBookmarkMetadata(id: number): Promise<Bookmark> {
   const res = await authFetch(`${API_BASE}/bookmarks/${id}/refresh-metadata`, {
     method: "POST",

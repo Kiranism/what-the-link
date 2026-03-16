@@ -7,6 +7,7 @@ import { generateSummary } from "../services/gemini-summarizer";
 import { generateTags } from "../services/gemini-tagger";
 import { isGeminiConfigured } from "../services/gemini-client";
 import { smartSearch } from "../services/smart-search";
+import { parseBookmarkHtml, importBookmarks } from "../services/bookmark-import";
 import { and, desc, eq, inArray, like, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { logger } from "../utils/logger";
@@ -140,6 +141,39 @@ bookmarksRouter.get("/tags", async (c) => {
   return c.json({ tags });
 });
 
+bookmarksRouter.post("/import", async (c) => {
+  try {
+    const body = await c.req.parseBody();
+    const file = body["file"];
+
+    if (!file || typeof file === "string") {
+      return c.json({ error: "No file uploaded. Upload an HTML bookmark export file." }, 400);
+    }
+
+    const text = await (file as File).text();
+    if (!text.includes("<DT>") && !text.includes("<dt>")) {
+      return c.json({ error: "Invalid bookmark file. Export bookmarks as HTML from your browser." }, 400);
+    }
+
+    const parsed = parseBookmarkHtml(text);
+    if (parsed.length === 0) {
+      return c.json({ error: "No bookmarks found in the uploaded file." }, 400);
+    }
+
+    logger.info("Starting bookmark import", { count: parsed.length });
+
+    const result = await importBookmarks(parsed);
+
+    logger.info("Bookmark import complete", { ...result });
+
+    return c.json({ ...result });
+  } catch (error) {
+    logger.error("Bookmark import failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return c.json({ error: "Import failed. Check the file format." }, 500);
+  }
+});
 
 bookmarksRouter.post("/bulk", async (c) => {
   const body = (await c.req.json()) as {
