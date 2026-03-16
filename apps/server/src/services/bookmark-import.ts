@@ -2,9 +2,6 @@ import * as cheerio from "cheerio";
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { eq } from "drizzle-orm";
-import { fetchMetadata } from "./metadata";
-import { generateSummary } from "./gemini-summarizer";
-import { generateTags } from "./gemini-tagger";
 import { isGeminiConfigured } from "./gemini-client";
 import { logger } from "../utils/logger";
 
@@ -105,76 +102,38 @@ export async function importBookmarks(
         continue;
       }
 
-      // Fetch metadata (with AI fallback for blocked sites)
-      const metadata = await fetchMetadata(bm.url);
-
-      const title = metadata.title || bm.title || bm.url;
+      // Use title from the HTML export file directly — skip metadata
+      // fetching and AI calls to avoid exhausting API rate limits.
+      // The background retry job will enrich them gradually.
+      const domain = new URL(bm.url).hostname;
+      const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+      const title = bm.title || bm.url;
       const folderTag = bm.folder ? [bm.folder] : [];
 
       const createdAt = bm.addDate
         ? new Date(bm.addDate * 1000)
         : new Date();
 
-      const [inserted] = await db.insert(bookmarks).values({
+      await db.insert(bookmarks).values({
         url: bm.url,
         title,
-        description: metadata.description ?? null,
-        image: metadata.image ?? null,
-        favicon: metadata.favicon ?? null,
-        domain: metadata.domain,
+        description: null,
+        image: null,
+        favicon,
+        domain,
         tags: folderTag,
         source: "import",
-        metadataStatus: metadata.success ? "complete" : "failed",
+        metadataStatus: "failed",
         summaryStatus: geminiReady ? "pending" : "skipped",
         createdAt,
-      }).returning();
+      });
 
       result.imported++;
 
-      // Fire-and-forget: AI summary + auto-tags
-      if (geminiReady && inserted) {
-        const metaTitle = title;
-        const metaDesc = metadata.description ?? null;
-
-        generateSummary(bm.url, metaTitle, metaDesc)
-          .then(async (summary) => {
-            if (summary) {
-              await db
-                .update(bookmarks)
-                .set({ summary, summaryStatus: "complete", updatedAt: new Date() })
-                .where(eq(bookmarks.id, inserted.id));
-            } else {
-              await db
-                .update(bookmarks)
-                .set({ summaryStatus: "failed", updatedAt: new Date() })
-                .where(eq(bookmarks.id, inserted.id));
-            }
-          })
-          .catch((err) => {
-            logger.error("Import summary error", {
-              url: bm.url,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-
-        // Auto-tag (merge with folder tag)
-        generateTags(bm.url, metaTitle, metaDesc)
-          .then(async (aiTags) => {
-            if (aiTags.length > 0) {
-              const merged = Array.from(new Set([...folderTag, ...aiTags]));
-              await db
-                .update(bookmarks)
-                .set({ tags: merged, updatedAt: new Date() })
-                .where(eq(bookmarks.id, inserted.id));
-            }
-          })
-          .catch((err) => {
-            logger.error("Import auto-tag error", {
-              url: bm.url,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          });
-      }
+      // AI summary + auto-tags are NOT fired during import to avoid
+      // exhausting API rate limits. Bookmarks are saved with
+      // summaryStatus: "pending" and the background retry job
+      // (every 5 min, batch of 10) will process them gradually.
     } catch (error) {
       result.failed++;
       logger.error("Import bookmark failed", {
