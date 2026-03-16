@@ -1,6 +1,7 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, eq, lt, or, sql } from "drizzle-orm";
+import { schedule, type ScheduledTask } from "node-cron";
 import { generateSummary } from "./gemini-summarizer";
 import { generateTags } from "./gemini-tagger";
 import { isAIConfigured } from "./ai-client";
@@ -9,10 +10,8 @@ import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 50;
-// Fallback interval — only matters if processAllPendingSummaries wasn't triggered
-const RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let task: ScheduledTask | null = null;
 let rateLimitedUntil = 0;
 let processing = false;
 
@@ -187,14 +186,14 @@ export async function processAllPendingSummaries(): Promise<void> {
 }
 
 export function startSummaryRetryJob(): void {
-  // Fallback interval for any stragglers/failures
-  intervalId = setInterval(() => {
+  // Fallback cron for any stragglers/failures — every 5 minutes
+  task = schedule("*/5 * * * *", () => {
     processAllPendingSummaries().catch((err) => {
       logger.error("Summary retry job failed", {
         error: err instanceof Error ? err.message : String(err),
       });
     });
-  }, RETRY_INTERVAL_MS);
+  });
 
   // Process everything immediately on startup, then chain into embeddings
   processAllPendingSummaries()
@@ -205,12 +204,12 @@ export function startSummaryRetryJob(): void {
       });
     });
 
-  logger.info("Summary retry job started", { intervalMs: RETRY_INTERVAL_MS });
+  logger.info("Summary retry job started", { schedule: "*/5 * * * *" });
 }
 
 export function stopSummaryRetryJob(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (task) {
+    task.stop();
+    task = null;
   }
 }

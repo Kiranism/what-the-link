@@ -1,6 +1,7 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, eq, lt, or, sql } from "drizzle-orm";
+import { schedule, type ScheduledTask } from "node-cron";
 import { isAIConfigured } from "./ai-client";
 import {
   generateEmbedding,
@@ -12,10 +13,8 @@ import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 50;
-// Fallback interval — only matters if processAllPendingEmbeddings wasn't triggered
-const RETRY_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let task: ScheduledTask | null = null;
 let rateLimitedUntil = 0;
 let processing = false;
 
@@ -167,24 +166,24 @@ export async function processAllPendingEmbeddings(): Promise<void> {
 }
 
 export function startEmbeddingRetryJob(): void {
-  // Fallback interval for any stragglers/failures
-  intervalId = setInterval(() => {
+  // Fallback cron for any stragglers/failures — every 5 minutes
+  task = schedule("*/5 * * * *", () => {
     processAllPendingEmbeddings().catch((err) => {
       logger.error("Embedding retry job failed", {
         error: err instanceof Error ? err.message : String(err),
       });
     });
-  }, RETRY_INTERVAL_MS);
+  });
 
   // NOTE: no immediate run here — the summary job chains into embeddings on startup.
-  // The fallback interval catches anything that slips through.
+  // The fallback cron catches anything that slips through.
 
-  logger.info("Embedding retry job started", { intervalMs: RETRY_INTERVAL_MS });
+  logger.info("Embedding retry job started", { schedule: "*/5 * * * *" });
 }
 
 export function stopEmbeddingRetryJob(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (task) {
+    task.stop();
+    task = null;
   }
 }

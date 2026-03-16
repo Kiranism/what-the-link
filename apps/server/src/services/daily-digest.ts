@@ -1,34 +1,36 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { schedule, type ScheduledTask } from "node-cron";
 import { getSocket } from "./whatsapp/connection";
 import { getCachedWaAllowedGroupJid, getCachedDigestEnabled, getCachedDigestHour } from "./settings";
 import { env } from "@bookmark/env/server";
 import { logger } from "../utils/logger";
 
-/** Interval handle so we can stop the job. */
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let task: ScheduledTask | null = null;
 
 /** ISO date string (YYYY-MM-DD) of the last digest we sent, to avoid duplicates. */
 let lastDigestDate: string | null = null;
 
 export function startDailyDigest(): void {
-  if (intervalId) return;
-  logger.info("Daily digest job started");
-  // Check every minute
-  intervalId = setInterval(() => {
+  if (task) return;
+
+  // Check every minute at :00 seconds — hour is dynamic from DB settings
+  task = schedule("* * * * *", () => {
     checkAndSendDigest().catch((err) => {
       logger.error("Daily digest check failed", {
         error: err instanceof Error ? err.message : String(err),
       });
     });
-  }, 60_000);
+  });
+
+  logger.info("Daily digest job started");
 }
 
 export function stopDailyDigest(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (task) {
+    task.stop();
+    task = null;
     logger.info("Daily digest job stopped");
   }
 }
@@ -43,6 +45,9 @@ async function checkAndSendDigest(): Promise<void> {
   // Only fire at the configured hour
   if (now.getHours() !== getCachedDigestHour()) return;
 
+  // Only fire in the first minute of the hour to avoid sending 60 times
+  if (now.getMinutes() !== 0) return;
+
   // Already sent today
   if (lastDigestDate === todayStr) return;
 
@@ -51,17 +56,11 @@ async function checkAndSendDigest(): Promise<void> {
     getCachedWaAllowedGroupJid() ??
     env.WA_ALLOWED_GROUP_JID?.trim() ??
     null;
-  if (!groupJid) {
-    logger.info("Daily digest skipped — no waAllowedGroupJid configured");
-    return;
-  }
+  if (!groupJid) return;
 
   // Need an active socket
   const sock = getSocket();
-  if (!sock) {
-    logger.info("Daily digest skipped — WhatsApp not connected");
-    return;
-  }
+  if (!sock) return;
 
   // Mark as sent immediately to avoid double-send if the query takes time
   lastDigestDate = todayStr;
@@ -86,7 +85,6 @@ async function buildDigestMessage(): Promise<string | null> {
   const now = new Date();
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-  // ---- Bookmarks saved in the last 24 hours ----
   const todayBookmarks = await db
     .select()
     .from(bookmarks)
@@ -100,11 +98,10 @@ async function buildDigestMessage(): Promise<string | null> {
 
   if (todayBookmarks.length === 0) return null;
 
-  // Count links vs notes (notes have no real URL / domain is empty-ish)
-  const linkCount = todayBookmarks.filter((b) => b.url && b.domain).length;
+  const linkCount = todayBookmarks.filter((b) => !b.url.startsWith("note://")).length;
   const noteCount = todayBookmarks.length - linkCount;
 
-  // ---- Top tags ----
+  // Top tags
   const tagCounts = new Map<string, number>();
   for (const b of todayBookmarks) {
     const tags = Array.isArray(b.tags) ? b.tags : [];
@@ -118,7 +115,7 @@ async function buildDigestMessage(): Promise<string | null> {
     .map(([tag, count]) => `${tag} (${count})`)
     .join(", ");
 
-  // ---- Recent saves list (max 5) ----
+  // Recent saves (max 5)
   const maxShown = 5;
   const shownBookmarks = todayBookmarks.slice(0, maxShown);
   const recentLines = shownBookmarks.map(
@@ -129,7 +126,7 @@ async function buildDigestMessage(): Promise<string | null> {
     recentLines.push(`... and ${remaining} more`);
   }
 
-  // ---- Archive resurfacing: random bookmark older than 3 months ----
+  // Archive resurfacing: random bookmark older than 3 months
   const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   const archiveRows = await db
     .select()
@@ -143,32 +140,30 @@ async function buildDigestMessage(): Promise<string | null> {
     .orderBy(sql`RANDOM()`)
     .limit(1);
 
-  // ---- Assemble message ----
+  // Assemble message
   const parts: string[] = [];
   parts.push("📊 *Daily Bookmark Digest*\n");
 
-  // Summary line
   const segments: string[] = [];
   if (linkCount > 0) segments.push(`*${linkCount} link${linkCount !== 1 ? "s" : ""}*`);
   if (noteCount > 0) segments.push(`*${noteCount} note${noteCount !== 1 ? "s" : ""}*`);
   parts.push(`You saved ${segments.join(" and ")} today.\n`);
 
-  // Top tags
   if (topTags) {
     parts.push(`🏷️ Top tags: ${topTags}\n`);
   }
 
-  // Recent saves
   parts.push(`📌 *Recent saves:*`);
   parts.push(recentLines.join("\n"));
 
-  // Archive resurfacing
   if (archiveRows.length > 0) {
     const old = archiveRows[0]!;
     parts.push("");
     parts.push(`💡 *From your archive:*`);
     parts.push(old.title ?? old.url);
-    parts.push(old.url);
+    if (!old.url.startsWith("note://")) {
+      parts.push(old.url);
+    }
   }
 
   parts.push("");

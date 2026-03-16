@@ -1,14 +1,14 @@
 import { bookmarks } from "@bookmark/db/schema/bookmarks";
 import { db } from "@bookmark/db";
 import { and, eq, lt } from "drizzle-orm";
+import { schedule, type ScheduledTask } from "node-cron";
 import { fetchMetadata } from "./metadata";
 import { logger } from "../utils/logger";
 
 const MAX_RETRIES = 3;
 const BATCH_SIZE = 3;
-const RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
-let intervalId: ReturnType<typeof setInterval> | null = null;
+let task: ScheduledTask | null = null;
 let rateLimitedUntil = 0;
 
 function isRateLimitError(error: unknown): boolean {
@@ -109,24 +109,21 @@ async function retryFailedMetadata(): Promise<void> {
 }
 
 export function startMetadataRetryJob(): void {
-  intervalId = setInterval(() => {
+  // Every 30 minutes
+  task = schedule("*/30 * * * *", () => {
     retryFailedMetadata().catch((err) => {
       logger.error("Metadata retry job failed", {
         error: err instanceof Error ? err.message : String(err),
       });
     });
-  }, RETRY_INTERVAL_MS);
-
-  logger.info("Metadata retry job started", {
-    intervalMs: RETRY_INTERVAL_MS,
-    batchSize: BATCH_SIZE,
-    maxRetries: MAX_RETRIES,
   });
+
+  logger.info("Metadata retry job started", { schedule: "*/30 * * * *" });
 }
 
 export function stopMetadataRetryJob(): void {
-  if (intervalId) {
-    clearInterval(intervalId);
-    intervalId = null;
+  if (task) {
+    task.stop();
+    task = null;
   }
 }
