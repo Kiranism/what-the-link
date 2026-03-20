@@ -49,12 +49,6 @@ Open the web app, enter your password, go to **Settings**, scan the QR with What
 
 ## Deploy
 
-### One-click (Railway)
-
-[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/new/template?template=https%3A%2F%2Fgithub.com%2FKiranism%2Fwhat-the-link&envs=APP_PASSWORD&APP_PASSWORDDesc=Password+for+the+web+UI)
-
-> After deploying, add a **volume** mounted at `/data` in the Railway dashboard for persistent storage (database + WhatsApp session).
-
 ### One-command install (VPS)
 
 ```bash
