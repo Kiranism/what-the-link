@@ -165,7 +165,7 @@ export const BookmarkRow = memo(function BookmarkRow({
               <div className="size-5 shrink-0 rounded-sm bg-muted-foreground/20 mt-0.5" />
             )}
             <div className="flex flex-col min-w-0 gap-0.5 flex-1">
-              <span className="line-clamp-2 text-[13px] font-medium text-foreground break-words leading-snug">
+              <span className="line-clamp-2 text-[13px] font-medium text-foreground break-all leading-snug">
                 {bookmark.title || bookmark.url}
               </span>
               <div className="flex items-center gap-1.5 flex-wrap">
