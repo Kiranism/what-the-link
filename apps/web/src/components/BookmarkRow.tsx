@@ -147,12 +147,11 @@ export const BookmarkRow = memo(function BookmarkRow({
         </FrameHeader>
 
         {/* Mobile: stacked layout */}
-        <div
-          className="flex sm:hidden flex-col gap-1.5 px-2.5 py-2 cursor-pointer"
-          onClick={onToggleExpanded}
-        >
-          {/* Favicon + title + domain */}
-          <div className="flex items-start gap-2 min-w-0">
+        <div className="sm:hidden">
+          <div
+            className="flex items-start gap-2 px-3 pt-2.5 pb-1 cursor-pointer"
+            onClick={onToggleExpanded}
+          >
             {bookmark.favicon ? (
               <img
                 src={bookmark.favicon}
@@ -166,76 +165,73 @@ export const BookmarkRow = memo(function BookmarkRow({
               <div className="size-5 shrink-0 rounded-sm bg-muted-foreground/20 mt-0.5" />
             )}
             <div className="flex flex-col min-w-0 gap-0.5 flex-1">
-              <a
-                href={bookmark.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="line-clamp-2 text-[13px] font-medium text-foreground no-underline hover:text-primary hover:no-underline break-words leading-snug"
-                onClick={(event) => event.stopPropagation()}
-              >
+              <span className="line-clamp-2 text-[13px] font-medium text-foreground break-words leading-snug">
                 {bookmark.title || bookmark.url}
-              </a>
-              <span className="truncate text-[11px] text-muted-foreground">
-                {bookmark.domain}
               </span>
-            </div>
-          </div>
-
-          {/* Tags + date + actions row */}
-          <div className="flex items-center justify-between gap-1 pl-7">
-            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-muted-foreground">
+                  {bookmark.domain}
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  · {dateFormatter.format(new Date(String(bookmark.createdAt)))}
+                </span>
+              </div>
               {tags.length > 0 && (
-                <>
-                  {tags.slice(0, 2).map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 h-[18px] shrink-0">
+                <div className="flex flex-wrap gap-1 mt-0.5">
+                  {tags.slice(0, 3).map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 h-[18px]">
                       {tag}
                     </Badge>
                   ))}
-                  {tags.length > 2 && (
-                    <span className="text-[9px] text-muted-foreground shrink-0">+{tags.length - 2}</span>
+                  {tags.length > 3 && (
+                    <span className="text-[9px] text-muted-foreground self-center">+{tags.length - 3}</span>
                   )}
-                </>
+                </div>
               )}
-              <span className="text-muted-foreground text-[11px] shrink-0">
-                {dateFormatter.format(new Date(String(bookmark.createdAt)))}
-              </span>
             </div>
-            <div
-              className="flex items-center shrink-0 -mr-1"
-              onClick={(event) => event.stopPropagation()}
+          </div>
+          {/* Actions bar — always visible */}
+          <div className="flex items-center justify-end gap-0.5 px-2 pb-1.5">
+            <CopyButton
+              content={bookmark.url}
+              copied={isCopied || undefined}
+              delay={1000}
+              variant="ghost"
+              size="xs"
+              className="size-8 text-muted-foreground"
+              aria-label="Copy link"
+              onCopiedChange={(copied) => {
+                if (copied) toast.success("Link copied to clipboard");
+              }}
+            />
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-8 text-muted-foreground"
+              aria-label="Edit bookmark"
+              onClick={() => onEdit(bookmark)}
             >
-              <CopyButton
-                content={bookmark.url}
-                copied={isCopied || undefined}
-                delay={1000}
-                variant="ghost"
-                size="xs"
-                className="size-7 text-muted-foreground hover:text-foreground"
-                aria-label="Copy link"
-                onCopiedChange={(copied) => {
-                  if (copied) toast.success("Link copied to clipboard");
-                }}
-              />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="size-7 text-muted-foreground hover:text-foreground"
-                aria-label="Open link"
-                onClick={() => onOpenLink(bookmark)}
-              >
-                <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="size-7 text-muted-foreground hover:text-destructive"
-                aria-label="Delete bookmark"
-                disabled={isPendingDelete}
-                onClick={() => onDelete(bookmark)}
-              >
-                <Trash2Icon aria-hidden="true" className="size-3.5" />
-              </Button>
-            </div>
+              <PencilIcon aria-hidden="true" className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-8 text-muted-foreground"
+              aria-label="Open link"
+              onClick={() => onOpenLink(bookmark)}
+            >
+              <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-8 text-muted-foreground"
+              aria-label="Delete bookmark"
+              disabled={isPendingDelete}
+              onClick={() => onDelete(bookmark)}
+            >
+              <Trash2Icon aria-hidden="true" className="size-3.5" />
+            </Button>
           </div>
         </div>
 
