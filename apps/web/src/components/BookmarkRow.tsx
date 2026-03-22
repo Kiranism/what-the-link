@@ -43,7 +43,7 @@ export const BookmarkRow = memo(function BookmarkRow({
       role="option"
       aria-selected={isFocused}
       aria-label={`${bookmark.title || bookmark.url}`}
-      className={`w-full group/row bg-muted/40 p-0 sm:p-1 rounded-xl sm:rounded-2xl transition-[background-color] duration-150 ${isFocused ? "bg-muted!" : "hover:bg-muted!"}`}
+      className={`w-full group/row bg-muted/40 p-0.5 sm:p-1 rounded-lg sm:rounded-2xl transition-[background-color] duration-150 ${isFocused ? "bg-muted!" : "hover:bg-muted!"}`}
       data-bookmark-row
     >
       <Collapsible open={isExpanded} onOpenChange={onToggleExpanded}>
@@ -148,58 +148,60 @@ export const BookmarkRow = memo(function BookmarkRow({
 
         {/* Mobile: stacked layout */}
         <div
-          className="flex sm:hidden flex-col gap-2 px-3 py-2.5 cursor-pointer"
+          className="flex sm:hidden flex-col gap-1.5 px-2.5 py-2 cursor-pointer"
           onClick={onToggleExpanded}
         >
           {/* Favicon + title + domain */}
-          <div className="flex items-start gap-2.5 min-w-0">
+          <div className="flex items-start gap-2 min-w-0">
             {bookmark.favicon ? (
               <img
                 src={bookmark.favicon}
                 alt=""
-                width={24}
-                height={24}
-                className="size-6 shrink-0 rounded-sm mt-0.5"
+                width={20}
+                height={20}
+                className="size-5 shrink-0 rounded-sm mt-0.5"
                 loading="lazy"
               />
             ) : (
-              <div className="size-6 shrink-0 rounded-sm bg-muted-foreground/20 mt-0.5" />
+              <div className="size-5 shrink-0 rounded-sm bg-muted-foreground/20 mt-0.5" />
             )}
-            <div className="flex flex-col min-w-0 gap-0.5">
+            <div className="flex flex-col min-w-0 gap-0.5 flex-1">
               <a
                 href={bookmark.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="line-clamp-2 text-sm font-medium text-foreground no-underline hover:text-primary hover:no-underline break-words"
+                className="line-clamp-2 text-[13px] font-medium text-foreground no-underline hover:text-primary hover:no-underline break-words leading-snug"
                 onClick={(event) => event.stopPropagation()}
               >
                 {bookmark.title || bookmark.url}
               </a>
-              <span className="truncate text-xs text-muted-foreground">
+              <span className="truncate text-[11px] text-muted-foreground">
                 {bookmark.domain}
               </span>
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-0.5">
-                  {tags.slice(0, 3).map((tag) => (
-                    <Badge key={tag} variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-                      {tag}
-                    </Badge>
-                  ))}
-                  {tags.length > 3 && (
-                    <span className="text-[10px] text-muted-foreground self-center">+{tags.length - 3}</span>
-                  )}
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Date + actions */}
-          <div className="flex items-center justify-between -mx-1">
-            <span className="text-muted-foreground text-xs ml-1">
-              {dateFormatter.format(new Date(String(bookmark.createdAt)))}
-            </span>
+          {/* Tags + date + actions row */}
+          <div className="flex items-center justify-between gap-1 pl-7">
+            <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+              {tags.length > 0 && (
+                <>
+                  {tags.slice(0, 2).map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-[9px] px-1.5 py-0 h-[18px] shrink-0">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {tags.length > 2 && (
+                    <span className="text-[9px] text-muted-foreground shrink-0">+{tags.length - 2}</span>
+                  )}
+                </>
+              )}
+              <span className="text-muted-foreground text-[11px] shrink-0">
+                {dateFormatter.format(new Date(String(bookmark.createdAt)))}
+              </span>
+            </div>
             <div
-              className="flex items-center"
+              className="flex items-center shrink-0 -mr-1"
               onClick={(event) => event.stopPropagation()}
             >
               <CopyButton
@@ -208,7 +210,7 @@ export const BookmarkRow = memo(function BookmarkRow({
                 delay={1000}
                 variant="ghost"
                 size="xs"
-                className="size-8 text-muted-foreground hover:text-foreground"
+                className="size-7 text-muted-foreground hover:text-foreground"
                 aria-label="Copy link"
                 onCopiedChange={(copied) => {
                   if (copied) toast.success("Link copied to clipboard");
@@ -217,30 +219,21 @@ export const BookmarkRow = memo(function BookmarkRow({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="size-8 text-muted-foreground hover:text-foreground"
-                aria-label="Edit bookmark"
-                onClick={() => onEdit(bookmark)}
-              >
-                <PencilIcon aria-hidden="true" className="size-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="size-8 text-muted-foreground hover:text-foreground"
+                className="size-7 text-muted-foreground hover:text-foreground"
                 aria-label="Open link"
                 onClick={() => onOpenLink(bookmark)}
               >
-                <ExternalLinkIcon aria-hidden="true" className="size-4" />
+                <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="size-8 text-muted-foreground hover:text-destructive"
+                className="size-7 text-muted-foreground hover:text-destructive"
                 aria-label="Delete bookmark"
                 disabled={isPendingDelete}
                 onClick={() => onDelete(bookmark)}
               >
-                <Trash2Icon aria-hidden="true" className="size-4" />
+                <Trash2Icon aria-hidden="true" className="size-3.5" />
               </Button>
             </div>
           </div>
@@ -248,7 +241,7 @@ export const BookmarkRow = memo(function BookmarkRow({
 
         {/* Expanded description + AI summary */}
         <CollapsiblePanel>
-          <FramePanel className="px-3 py-3 sm:px-5 sm:py-5 space-y-3">
+          <FramePanel className="px-2.5 py-2.5 sm:px-5 sm:py-5 space-y-2 sm:space-y-3">
             {bookmark.summary ? (
               <div>
                 <p className="text-xs font-medium text-muted-foreground/70 mb-1">AI Summary</p>

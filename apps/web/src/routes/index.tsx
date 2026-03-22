@@ -296,7 +296,7 @@ function HomePage() {
         </InputGroupAddon>
         <InputGroupInput
           aria-label="Search bookmarks"
-          placeholder="Search by meaning, tag, or keyword…"
+          placeholder="Search bookmarks…"
           type="search"
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
@@ -371,8 +371,8 @@ function HomePage() {
 
       {/* Active tag filter indicator */}
       {selectedTag && (
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filtered by</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs sm:text-sm text-muted-foreground">Filtered by</span>
           <Badge variant="secondary" className="gap-1">
             {selectedTag}
             <button
@@ -387,7 +387,7 @@ function HomePage() {
               <span aria-hidden="true" className="text-xs leading-none">&times;</span>
             </button>
           </Badge>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-xs sm:text-sm text-muted-foreground">
             {total} {total === 1 ? "bookmark" : "bookmarks"}
           </span>
         </div>
@@ -434,15 +434,15 @@ function HomePage() {
       {/* Table */}
       <div ref={tableRef}>
         {!isLoading && total === 0 && !submittedSearch && !selectedTag ? (
-          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center gap-4">
+          <div className="flex flex-col items-center justify-center py-12 sm:py-24 text-center gap-3 sm:gap-4 px-4">
             {whatsappStatus?.connected ? (
               <>
-                <div className="rounded-full bg-muted p-4">
-                  <BookmarkPlus className="size-8 text-muted-foreground" />
+                <div className="rounded-full bg-muted p-3 sm:p-4">
+                  <BookmarkPlus className="size-6 sm:size-8 text-muted-foreground" />
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-medium">No bookmarks yet</h3>
-                  <p className="text-sm text-muted-foreground max-w-sm">
+                <div className="space-y-1">
+                  <h3 className="text-base sm:text-lg font-medium">No bookmarks yet</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xs sm:max-w-sm">
                     Start sending links to your connected WhatsApp to save
                     bookmarks.
                   </p>
@@ -450,14 +450,14 @@ function HomePage() {
               </>
             ) : (
               <>
-                <div className="rounded-full bg-muted p-4">
-                  <MessageCircle className="size-8 text-muted-foreground" />
+                <div className="rounded-full bg-muted p-3 sm:p-4">
+                  <MessageCircle className="size-6 sm:size-8 text-muted-foreground" />
                 </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-lg font-medium">
+                <div className="space-y-1">
+                  <h3 className="text-base sm:text-lg font-medium">
                     Connect WhatsApp to get started
                   </h3>
-                  <p className="text-sm text-muted-foreground max-w-sm">
+                  <p className="text-xs sm:text-sm text-muted-foreground max-w-xs sm:max-w-sm">
                     Link your WhatsApp account to start saving bookmarks by
                     simply sending links.
                   </p>
