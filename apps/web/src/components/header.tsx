@@ -27,7 +27,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-border/40 bg-background/80 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-5xl items-center gap-2 sm:gap-4 px-2 py-2 sm:px-6 sm:py-3 lg:px-8">
+      <div className="mx-auto flex w-full max-w-5xl items-center gap-2 sm:gap-4 px-2 py-2 sm:px-6 sm:py-3 lg:px-8">
         {/* Logo & app name */}
         <Link
           to="/"
@@ -73,7 +73,7 @@ export default function Header() {
         {isAuthenticated && (
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground"
               render={<button />}
             >
               <UserIcon aria-hidden="true" className="size-4" />
@@ -98,7 +98,7 @@ function ThemeToggle() {
     <Button
       variant="ghost"
       size="icon-sm"
-      className="size-8 text-muted-foreground"
+      className="size-8 shrink-0 text-muted-foreground"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
     >

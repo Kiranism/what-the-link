@@ -43,7 +43,7 @@ export const BookmarkRow = memo(function BookmarkRow({
       role="option"
       aria-selected={isFocused}
       aria-label={`${bookmark.title || bookmark.url}`}
-      className={`w-full group/row bg-muted/40 p-0.5 sm:p-1 rounded-lg sm:rounded-2xl transition-[background-color] duration-150 ${isFocused ? "bg-muted!" : "hover:bg-muted!"}`}
+      className={`w-full min-w-0 group/row bg-muted/40 p-0.5 sm:p-1 rounded-lg sm:rounded-2xl transition-[background-color] duration-150 overflow-hidden ${isFocused ? "bg-muted!" : "hover:bg-muted!"}`}
       data-bookmark-row
     >
       <Collapsible open={isExpanded} onOpenChange={onToggleExpanded}>

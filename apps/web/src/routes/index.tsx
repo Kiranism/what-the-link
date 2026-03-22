@@ -288,7 +288,7 @@ function HomePage() {
   );
 
   return (
-    <div className="flex flex-col gap-3 sm:gap-4">
+    <div className="flex flex-col gap-3 sm:gap-4 min-w-0">
       {/* Search */}
       <InputGroup className="w-full border-border/40 bg-muted/30 transition-[border-color,background-color] duration-150 focus-within:border-border focus-within:bg-background focus-within:ring-0 h-11 sm:h-14">
         <InputGroupAddon>
@@ -482,7 +482,7 @@ function HomePage() {
                 role="listbox"
                 aria-label="Bookmarks"
                 aria-activedescendant={activeDescendantId}
-                className="flex flex-col gap-1.5 sm:gap-2"
+                className="flex flex-col gap-1.5 sm:gap-2 min-w-0"
               >
                 {table.getRowModel().rows.map((row, index) => (
                   <BookmarkRow

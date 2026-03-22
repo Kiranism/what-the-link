@@ -219,6 +219,8 @@
   }
   html {
     @apply font-sans;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   /* Thin, minimal scrollbar that matches the theme */

@@ -55,7 +55,7 @@ function RootDocument() {
           <div className="relative min-h-svh overflow-x-hidden">
             <div className="relative grid min-h-svh grid-rows-[auto_1fr]">
               <Header />
-              <main className="mx-auto flex w-full max-w-5xl flex-col px-2 py-4 sm:px-6 sm:py-6 lg:px-8">
+              <main className="mx-auto flex w-full min-w-0 max-w-5xl flex-col px-2 py-4 sm:px-6 sm:py-6 lg:px-8 overflow-x-hidden">
                 <AuthGuard>
                   <GlobalShortcuts />
                   <Outlet />
