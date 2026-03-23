@@ -1,5 +1,9 @@
 # 𝙒𝞖𝞓𝞣 𝞣𝞖𝞢 𝙇𝞘𝞟𝞙¯\_(ツ)\_/¯
 
+## Demo
+
+https://github.com/user-attachments/assets/db65afbb-ad41-4d1f-aff7-97ded50c98d7
+
 ## Why another bookmarking tool?
 
 Have you ever used WhatsApp as your personal bookmarking tool? I did. I'd send myself links — articles, products, posts — right in a private group chat. But finding them later? A nightmare. Endless scrolling, lost links, no way to search.
