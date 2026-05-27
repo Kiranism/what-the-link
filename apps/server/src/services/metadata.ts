@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { getAIClient, getChatModel } from "./ai-client";
+import { fetchMetadataWithFirecrawl, isFirecrawlConfigured } from "./firecrawl-fetch";
 import { logger } from "../utils/logger";
 
 export interface Metadata {
@@ -9,13 +10,47 @@ export interface Metadata {
   favicon?: string;
   domain: string;
   success: boolean;
+  /** Compacted page text from Firecrawl, fed to summarizer/classifier when available. */
+  body?: string;
+}
+
+function resolveAbsoluteUrl(maybeUrl: string | undefined, base: string): string | undefined {
+  if (!maybeUrl) return undefined;
+  try {
+    return new URL(maybeUrl, base).href;
+  } catch {
+    return maybeUrl;
+  }
 }
 
 export async function fetchMetadata(url: string): Promise<Metadata> {
   const domain = new URL(url).hostname;
   const favicon = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
 
-  // Try cheerio-based crawling first
+  // Primary: Firecrawl (when configured). Falls through on null/junk so cheerio can try.
+  if (isFirecrawlConfigured()) {
+    const fc = await fetchMetadataWithFirecrawl(url);
+    if (fc) {
+      const fcTitle = fc.title?.trim();
+      const fcDesc = fc.description?.trim();
+      const titleUsable = !!fcTitle && fcTitle.length > 0 && !isJunkTitle(fcTitle);
+      const descUsable = !!fcDesc && fcDesc.length > 0 && !isJunkTitle(fcDesc);
+      if (titleUsable || descUsable) {
+        return {
+          title: titleUsable ? fcTitle.slice(0, 500) : undefined,
+          description: descUsable ? fcDesc.slice(0, 1000) : undefined,
+          image: resolveAbsoluteUrl(fc.image, url),
+          favicon,
+          domain,
+          success: true,
+          body: fc.markdown,
+        };
+      }
+      logger.info("Firecrawl returned no useful metadata, falling back to cheerio", { url });
+    }
+  }
+
+  // Fallback: cheerio-based crawling
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(10_000),

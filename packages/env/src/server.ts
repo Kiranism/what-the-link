@@ -30,6 +30,8 @@ export const env = createEnv({
     OPENROUTER_CHAT_MODEL: z.string().optional(),
     /** OpenRouter embedding model (default: google/gemini-embedding-001). */
     OPENROUTER_EMBEDDING_MODEL: z.string().optional(),
+    /** Firecrawl API key. When set, Firecrawl is the primary URL fetcher; cheerio is the fallback. */
+    FIRECRAWL_API_KEY: z.string().optional(),
   },
   runtimeEnv: {
     ...process.env,

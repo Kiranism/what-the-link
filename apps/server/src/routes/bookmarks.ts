@@ -55,6 +55,7 @@ bookmarksRouter.get("/", async (c) => {
   const tag = c.req.query("tag");
   const domain = c.req.query("domain");
 
+  const collection = c.req.query("collection");
   const archived = c.req.query("archived") === "true";
   const limit = Math.min(Number(c.req.query("limit")) || 50, 100);
   const offset = Number(c.req.query("offset")) || 0;
@@ -130,6 +131,9 @@ bookmarksRouter.get("/", async (c) => {
     conditions.push(eq(bookmarks.domain, domain.trim()));
   }
 
+  if (collection?.trim()) {
+    conditions.push(eq(bookmarks.collection, collection.trim()));
+  }
 
   const whereClause = and(...conditions);
 
@@ -154,6 +158,29 @@ bookmarksRouter.get("/", async (c) => {
     offset,
     searchMode: "basic" as const,
   });
+});
+
+bookmarksRouter.get("/shop", async (c) => {
+  const rows = await db
+    .select()
+    .from(bookmarks)
+    .where(and(eq(bookmarks.collection, "shopping"), eq(bookmarks.isArchived, false)))
+    .orderBy(desc(bookmarks.createdAt));
+
+  const groupsMap = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const tags = Array.isArray(row.tags) ? row.tags : [];
+    const category = (tags[0] ?? "other").toLowerCase();
+    const bucket = groupsMap.get(category) ?? [];
+    bucket.push(row);
+    groupsMap.set(category, bucket);
+  }
+
+  const groups = Array.from(groupsMap.entries())
+    .map(([category, items]) => ({ category, items, count: items.length }))
+    .sort((a, b) => b.count - a.count);
+
+  return c.json({ groups, total: rows.length });
 });
 
 bookmarksRouter.get("/tags", async (c) => {
@@ -598,6 +625,7 @@ bookmarksRouter.post("/:id/refresh-metadata", async (c) => {
       bookmark.url,
       metadata.title ?? bookmark.title,
       metadata.description ?? bookmark.description,
+      metadata.body ?? null,
     )
       .then(async (summary) => {
         if (summary) {

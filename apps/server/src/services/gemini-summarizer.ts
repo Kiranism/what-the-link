@@ -17,6 +17,7 @@ export async function generateSummary(
   url: string,
   title: string | null,
   description: string | null,
+  body: string | null = null,
 ): Promise<string | null> {
   const client = getAIClient();
   if (!client) {
@@ -25,12 +26,18 @@ export async function generateSummary(
   }
 
   try {
-    logger.info("Generating AI summary", { url, hasTitle: !!title, hasDescription: !!description });
+    logger.info("Generating AI summary", {
+      url,
+      hasTitle: !!title,
+      hasDescription: !!description,
+      bodyChars: body?.length ?? 0,
+    });
 
     const context = [
       `URL: ${url}`,
       title ? `Title: ${title}` : null,
       description ? `Description: ${description}` : null,
+      body ? `Page content (compacted):\n${body}` : null,
     ]
       .filter(Boolean)
       .join("\n");

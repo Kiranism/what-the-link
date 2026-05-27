@@ -6,6 +6,34 @@ import { logger } from "../../utils/logger";
 import type { WASocket } from "@whiskeysockets/baileys";
 
 const MAX_SEARCH_RESULTS = 5;
+const MAX_SHOP_ITEMS = 15;
+const SHOP_MENU_TTL_MS = 5 * 60_000;
+
+type ShopMenuState = {
+  categories: string[];
+  menuMessageId?: string;
+  expiresAt: number;
+};
+
+const shopMenus = new Map<string, ShopMenuState>();
+
+function getActiveShopMenu(jid: string): ShopMenuState | null {
+  const m = shopMenus.get(jid);
+  if (!m) return null;
+  if (Date.now() > m.expiresAt) {
+    shopMenus.delete(jid);
+    return null;
+  }
+  return m;
+}
+
+function setShopMenu(jid: string, categories: string[], menuMessageId?: string): void {
+  shopMenus.set(jid, {
+    categories,
+    menuMessageId,
+    expiresAt: Date.now() + SHOP_MENU_TTL_MS,
+  });
+}
 
 /**
  * Check if a message is a question query prefixed with "?".
@@ -46,6 +74,12 @@ Example: Check out that new CSS framework next week
 ?#tag — filter by tag
 ?recent — last 5 bookmarks
 ?recent 10 — last 10 bookmarks
+
+🛍 *Shop*
+?shop — list product categories you saved
+?shop watches — list products in a category
+After ?shop, reply with the number (e.g. 1) or quote the menu
+
 ?help — show this help
 
 All links are auto-tagged and summarized by AI.`;
@@ -230,6 +264,142 @@ async function sendSearchResults(
 
   if (Number(totalCount) > limit) {
     lines.push(`\n_Showing ${limit} of ${totalCount} results_`);
+  }
+
+  await sock.sendMessage(remoteJid, { text: lines.join("\n") }, { quoted: quotedMsg });
+}
+
+// =====================================================================
+// Shop commands: ?shop, ?shop <category>, numbered/quoted reply drill-in
+// =====================================================================
+
+export type ShopCommand =
+  | { kind: "menu" }
+  | { kind: "items"; category: string };
+
+/** "?shop" → menu, "?shop watches" → items. Returns null when not a shop command. */
+export function extractShopCommand(text: string): ShopCommand | null {
+  const lower = text.trim().toLowerCase();
+  if (!lower.startsWith("?shop")) return null;
+  // Reject "?shopping" or other prefix collisions
+  const after = lower.slice(5);
+  if (after !== "" && !after.startsWith(" ")) return null;
+  const rest = after.trim();
+  if (rest === "") return { kind: "menu" };
+  return { kind: "items", category: rest };
+}
+
+/**
+ * Bare number ("1") or category-name reply resolves against the last `?shop`
+ * menu for this chat (5 min TTL). Quoted replies are accepted only when the
+ * quoted message is the menu we sent.
+ */
+export function extractShopMenuReply(
+  text: string,
+  contextInfo: { stanzaId?: string } | undefined,
+  jid: string,
+): { category: string } | null {
+  const menu = getActiveShopMenu(jid);
+  if (!menu) return null;
+  const trimmed = text.trim().toLowerCase();
+
+  const isQuotedReply = !!contextInfo?.stanzaId;
+  if (isQuotedReply) {
+    // Only accept quoted replies that point at the menu message itself
+    if (contextInfo.stanzaId !== menu.menuMessageId) return null;
+  } else {
+    // Bare reply: must look like a menu choice — number or known category
+    const isDigit = /^\d{1,2}$/.test(trimmed);
+    if (!isDigit && !menu.categories.includes(trimmed)) return null;
+  }
+
+  if (/^\d{1,2}$/.test(trimmed)) {
+    const idx = parseInt(trimmed, 10) - 1;
+    const category = menu.categories[idx];
+    return category ? { category } : null;
+  }
+  if (menu.categories.includes(trimmed)) return { category: trimmed };
+  return null;
+}
+
+export async function handleShopMenuCommand(
+  sock: WASocket,
+  remoteJid: string,
+  quotedMsg: any,
+): Promise<void> {
+  const rows = await db
+    .select({ tags: bookmarks.tags })
+    .from(bookmarks)
+    .where(and(eq(bookmarks.collection, "shopping"), eq(bookmarks.isArchived, false)));
+
+  if (rows.length === 0) {
+    await sock.sendMessage(
+      remoteJid,
+      { text: "_No shop products yet. Share a Myntra / Amazon / Flipkart link to get started._" },
+      { quoted: quotedMsg },
+    );
+    return;
+  }
+
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const tags = Array.isArray(row.tags) ? row.tags : [];
+    const category = (tags[0] ?? "other").toLowerCase();
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+
+  const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  const categories = sorted.map(([c]) => c);
+
+  const lines = ["*🛍 Your shop collection*", ""];
+  sorted.forEach(([cat, count], i) => {
+    lines.push(`${i + 1}. ${cat} (${count})`);
+  });
+  lines.push("");
+  lines.push("_Reply with the number, the category name, or quote this message._");
+
+  const sent = await sock.sendMessage(
+    remoteJid,
+    { text: lines.join("\n") },
+    { quoted: quotedMsg },
+  );
+  setShopMenu(remoteJid, categories, sent?.key?.id ?? undefined);
+}
+
+export async function handleShopItemsCommand(
+  sock: WASocket,
+  remoteJid: string,
+  category: string,
+  quotedMsg: any,
+): Promise<void> {
+  const cat = category.trim().toLowerCase();
+  const rows = await db
+    .select()
+    .from(bookmarks)
+    .where(and(eq(bookmarks.collection, "shopping"), eq(bookmarks.isArchived, false)))
+    .orderBy(desc(bookmarks.createdAt));
+
+  const filtered = rows.filter((r) => {
+    const tags = Array.isArray(r.tags) ? r.tags : [];
+    return (tags[0] ?? "other").toLowerCase() === cat;
+  });
+
+  if (filtered.length === 0) {
+    await sock.sendMessage(
+      remoteJid,
+      { text: `_No products in "${cat}" yet._` },
+      { quoted: quotedMsg },
+    );
+    return;
+  }
+
+  const visible = filtered.slice(0, MAX_SHOP_ITEMS);
+  const lines = [`*${cat}* (${filtered.length})`, ""];
+  visible.forEach((b, i) => {
+    lines.push(`${i + 1}. ${b.title ?? b.url}\n   ${b.url}`);
+  });
+  if (filtered.length > visible.length) {
+    lines.push(`\n_Showing ${visible.length} of ${filtered.length}_`);
   }
 
   await sock.sendMessage(remoteJid, { text: lines.join("\n") }, { quoted: quotedMsg });

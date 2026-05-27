@@ -12,6 +12,8 @@ import {
 } from "../gemini-link-extractor";
 import { generateSummary } from "../gemini-summarizer";
 import { generateTags } from "../gemini-tagger";
+import { classifyShoppingCategory } from "../gemini-shop-classifier";
+import { isShoppingDomain } from "../../utils/shopping-domains";
 import { env } from "@bookmark/env/server";
 import {
   makeWASocket,
@@ -23,7 +25,16 @@ import {
 import { Boom } from "@hapi/boom";
 import fs from "fs";
 import pkg from "qrcode";
-import { handleSearchCommand, extractQuestionQuery, extractHelpCommand, handleHelpCommand } from "./commands";
+import {
+  handleSearchCommand,
+  extractQuestionQuery,
+  extractHelpCommand,
+  handleHelpCommand,
+  extractShopCommand,
+  extractShopMenuReply,
+  handleShopMenuCommand,
+  handleShopItemsCommand,
+} from "./commands";
 
 const { toDataURL } = pkg;
 
@@ -239,6 +250,30 @@ export async function initWhatsApp(): Promise<void> {
         continue;
       }
 
+      // --- Shop command (?shop or ?shop <category>) — must run before ?query dispatch ---
+      if (text && remoteJid && sock) {
+        const shopCmd = extractShopCommand(text);
+        if (shopCmd) {
+          if (shopCmd.kind === "menu") {
+            await handleShopMenuCommand(sock, remoteJid, msg);
+          } else {
+            await handleShopItemsCommand(sock, remoteJid, shopCmd.category, msg);
+          }
+          continue;
+        }
+      }
+
+      // --- Shop menu reply: bare number / category, or quoted reply to a recent menu ---
+      if (text && remoteJid && sock) {
+        const ctx = (msg.message as any)?.extendedTextMessage?.contextInfo;
+        const stanzaId = ctx?.stanzaId as string | undefined;
+        const pick = extractShopMenuReply(text, { stanzaId }, remoteJid);
+        if (pick) {
+          await handleShopItemsCommand(sock, remoteJid, pick.category, msg);
+          continue;
+        }
+      }
+
       // --- Question query: messages starting with "?" ---
       if (text && remoteJid && sock) {
         const questionQuery = extractQuestionQuery(text);
@@ -392,6 +427,7 @@ export async function initWhatsApp(): Promise<void> {
             : "";
 
           const aiReady = isAIConfigured();
+          const isShoppingUrl = isShoppingDomain(url);
 
           const [inserted] = await db.insert(bookmarks).values({
             url,
@@ -405,6 +441,7 @@ export async function initWhatsApp(): Promise<void> {
             whatsappMessageId: msg.key.id,
             metadataStatus: metadata.success ? "complete" : "failed",
             summaryStatus: aiReady ? "pending" : "skipped",
+            collection: isShoppingUrl ? "shopping" : null,
           }).returning();
 
           logger.info("Bookmark saved", { url, title: metadata.title, tags, source });
@@ -422,8 +459,9 @@ export async function initWhatsApp(): Promise<void> {
           if (aiReady && inserted) {
             const metaTitle = metadata.title ?? null;
             const metaDesc = metadata.description ?? null;
+            const metaBody = metadata.body ?? null;
 
-            generateSummary(url, metaTitle, metaDesc)
+            generateSummary(url, metaTitle, metaDesc, metaBody)
               .then(async (summary) => {
                 if (summary) {
                   await db
@@ -445,8 +483,26 @@ export async function initWhatsApp(): Promise<void> {
                 });
               });
 
-            // Auto-tag when no user-provided tags
-            if (tags.length === 0) {
+            // For shopping URLs, run the focused classifier; otherwise fall back to free-form tagger
+            if (isShoppingUrl) {
+              classifyShoppingCategory({ url, title: metaTitle, description: metaDesc, body: metaBody })
+                .then(async (category) => {
+                  if (category) {
+                    const merged = Array.from(new Set([category, ...tags]));
+                    await db
+                      .update(bookmarks)
+                      .set({ tags: merged, updatedAt: new Date() })
+                      .where(eq(bookmarks.id, inserted.id));
+                    logger.info("Shop category applied", { url, category });
+                  }
+                })
+                .catch((err) => {
+                  logger.error("Shop classification error", {
+                    url,
+                    error: err instanceof Error ? err.message : String(err),
+                  });
+                });
+            } else if (tags.length === 0) {
               generateTags(url, metaTitle, metaDesc)
                 .then(async (aiTags) => {
                   if (aiTags.length > 0) {

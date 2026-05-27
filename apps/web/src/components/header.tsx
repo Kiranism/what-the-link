@@ -11,6 +11,7 @@ import {
   LogOutIcon,
   MoonIcon,
   Settings2Icon,
+  ShoppingBagIcon,
   SunIcon,
   UserIcon,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { useAuth } from "../hooks/useAuth";
 
 const links = [
   { to: "/", label: "Library", icon: BookmarkIcon },
+  { to: "/shop", label: "Shop", icon: ShoppingBagIcon },
   { to: "/settings", label: "Settings", icon: Settings2Icon },
 ] as const;
 

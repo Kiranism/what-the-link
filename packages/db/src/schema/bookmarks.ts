@@ -40,12 +40,14 @@ export const bookmarks = sqliteTable(
     embedding: blob("embedding"),
     embeddingStatus: text("embedding_status").notNull().default("pending"),
     embeddingRetries: integer("embedding_retries").notNull().default(0),
+    collection: text("collection"),
   },
   (table) => ({
     createdAtIdx: index("idx_bookmarks_created_at").on(table.createdAt),
     domainIdx: index("idx_bookmarks_domain").on(table.domain),
 
     archivedIdx: index("idx_bookmarks_archived").on(table.isArchived),
+    collectionIdx: index("idx_bookmarks_collection").on(table.collection),
   }),
 );
 

@@ -13,6 +13,7 @@
     "@bookmark/db": "*",
     "@bookmark/env": "*",
     "@hono/node-server": "^1.14.4",
+    "@mendable/firecrawl-js": "^4.4.0",
     "@whiskeysockets/baileys": "6.7.18",
     "cheerio": "^1.0.0",
     "dotenv": "^17.2.2",

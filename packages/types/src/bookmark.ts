@@ -16,6 +16,7 @@ export interface Bookmark {
   summary: string | null;
   summaryStatus: string;
   embeddingStatus: string;
+  collection: string | null;
 }
 
 export interface BookmarkListResponse {

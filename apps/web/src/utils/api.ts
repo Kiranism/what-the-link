@@ -92,6 +92,23 @@ export async function fetchTags(): Promise<TagCount[]> {
   return data.tags ?? [];
 }
 
+export interface ShopGroup {
+  category: string;
+  items: Bookmark[];
+  count: number;
+}
+
+export interface ShopGroupsResponse {
+  groups: ShopGroup[];
+  total: number;
+}
+
+export async function fetchShopGroups(): Promise<ShopGroupsResponse> {
+  const res = await authFetch(`${API_BASE}/bookmarks/shop`);
+  if (!res.ok) throw new Error("Failed to fetch shop");
+  return res.json();
+}
+
 export type BulkAction = "archive" | "unarchive" | "delete" | "addTags";
 
 export async function bulkUpdateBookmarks(
