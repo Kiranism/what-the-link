@@ -4,7 +4,7 @@ import { db, dbClient } from "@bookmark/db";
 import { fetchMetadata } from "../services/metadata";
 import { normalizeUrl } from "../utils/url-extractor";
 import { generateSummary } from "../services/gemini-summarizer";
-import { generateTags } from "../services/gemini-tagger";
+import { classifyBookmark } from "../services/gemini-bookmark-classifier";
 import { isAIConfigured } from "../services/ai-client";
 import { smartSearch } from "../services/smart-search";
 import { removeEmbeddingCacheEntry, updateEmbeddingCacheArchived, setEmbeddingCacheEntry } from "../services/embedding-cache";
@@ -490,25 +490,32 @@ bookmarksRouter.post("/", async (c) => {
         });
       });
 
-    // Auto-tag when no user-provided tags
+    // One AI call decides tags + shopping/not + category.
+    // User-provided tags are preserved and AI tags merge in around them.
     const userTags = Array.isArray(body.tags) ? body.tags : [];
-    if (userTags.length === 0) {
-      generateTags(url, metaTitle, metaDesc)
-        .then(async (aiTags) => {
-          if (aiTags.length > 0) {
-            await db
-              .update(bookmarks)
-              .set({ tags: aiTags, updatedAt: new Date() })
-              .where(eq(bookmarks.id, created.id));
-          }
-        })
-        .catch((err) => {
-          logger.error("Auto-tagging error on create", {
-            url,
-            error: err instanceof Error ? err.message : String(err),
-          });
+    classifyBookmark({ url, title: metaTitle, description: metaDesc })
+      .then(async (result) => {
+        if (!result) return;
+        const finalSet = new Set<string>(userTags);
+        if (result.collection === "shopping" && result.category) {
+          finalSet.add(result.category);
+        }
+        for (const t of result.tags) finalSet.add(t);
+        await db
+          .update(bookmarks)
+          .set({
+            tags: Array.from(finalSet),
+            collection: result.collection,
+            updatedAt: new Date(),
+          })
+          .where(eq(bookmarks.id, created.id));
+      })
+      .catch((err) => {
+        logger.error("Classification error on create", {
+          url,
+          error: err instanceof Error ? err.message : String(err),
         });
-    }
+      });
   }
 
   // If AI is not configured, no summary will come — embed from title/tags now.

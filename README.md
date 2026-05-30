@@ -17,7 +17,7 @@ No more scrolling. No more lost links. Just your bookmarks, right where you want
 - **WhatsApp integration** — Send a link in your chat; it's saved automatically
 - **Metadata** — Title, description, and image fetched from Open Graph (Firecrawl-primary with cheerio fallback so anti-bot e-commerce pages still resolve)
 - **Tagging** — Add `#hashtags` alongside your links to organize them
-- **Shop collection** — Links from Myntra, Amazon, Flipkart, Ajio, Nykaa and 25+ other stores are auto-detected, classified into a category (watches, shoes, electronics, ...) and grouped on a dedicated `/shop` page
+- **Shop collection** — Any product link (Amazon, Myntra, Flipkart, Etsy, niche Shopify stores, indie boutiques — no list to maintain) is detected by AI from the URL + page content, classified into a category (watches, shoes, electronics, ...) and grouped on a dedicated `/shop` page
 - **WhatsApp shortcuts** — `?shop` for a numbered category menu, `?shop watches` to drill in, bare-number or quoted-reply to pick from the last menu
 - **Web UI** — Search, filter by tags/domain, keyboard shortcuts
 - **Single user** — Password-protected; no OAuth

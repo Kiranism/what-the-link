@@ -12,8 +12,7 @@ import {
 } from "../gemini-link-extractor";
 import { generateSummary } from "../gemini-summarizer";
 import { generateTags } from "../gemini-tagger";
-import { classifyShoppingCategory } from "../gemini-shop-classifier";
-import { isShoppingDomain } from "../../utils/shopping-domains";
+import { classifyBookmark } from "../gemini-bookmark-classifier";
 import { env } from "@bookmark/env/server";
 import {
   makeWASocket,
@@ -427,7 +426,6 @@ export async function initWhatsApp(): Promise<void> {
             : "";
 
           const aiReady = isAIConfigured();
-          const isShoppingUrl = isShoppingDomain(url);
 
           const [inserted] = await db.insert(bookmarks).values({
             url,
@@ -441,7 +439,8 @@ export async function initWhatsApp(): Promise<void> {
             whatsappMessageId: msg.key.id,
             metadataStatus: metadata.success ? "complete" : "failed",
             summaryStatus: aiReady ? "pending" : "skipped",
-            collection: isShoppingUrl ? "shopping" : null,
+            // collection is set later by the AI classifier, which decides
+            // shopping vs not from URL + metadata + Firecrawl page body
           }).returning();
 
           logger.info("Bookmark saved", { url, title: metadata.title, tags, source });
@@ -483,43 +482,38 @@ export async function initWhatsApp(): Promise<void> {
                 });
               });
 
-            // For shopping URLs, run the focused classifier; otherwise fall back to free-form tagger
-            if (isShoppingUrl) {
-              classifyShoppingCategory({ url, title: metaTitle, description: metaDesc, body: metaBody })
-                .then(async (category) => {
-                  if (category) {
-                    const merged = Array.from(new Set([category, ...tags]));
-                    await db
-                      .update(bookmarks)
-                      .set({ tags: merged, updatedAt: new Date() })
-                      .where(eq(bookmarks.id, inserted.id));
-                    logger.info("Shop category applied", { url, category });
-                  }
-                })
-                .catch((err) => {
-                  logger.error("Shop classification error", {
-                    url,
-                    error: err instanceof Error ? err.message : String(err),
-                  });
+            // One AI call decides tags + shopping/not + category.
+            // User-provided hashtags are preserved; AI tags merge in around them.
+            classifyBookmark({ url, title: metaTitle, description: metaDesc, body: metaBody })
+              .then(async (result) => {
+                if (!result) return;
+                const finalTagsSet = new Set<string>(tags);
+                if (result.collection === "shopping" && result.category) {
+                  finalTagsSet.add(result.category);
+                }
+                for (const t of result.tags) finalTagsSet.add(t);
+                const finalTags = Array.from(finalTagsSet);
+                await db
+                  .update(bookmarks)
+                  .set({
+                    tags: finalTags,
+                    collection: result.collection,
+                    updatedAt: new Date(),
+                  })
+                  .where(eq(bookmarks.id, inserted.id));
+                logger.info("Classification applied", {
+                  url,
+                  tags: finalTags,
+                  collection: result.collection,
+                  category: result.category,
                 });
-            } else if (tags.length === 0) {
-              generateTags(url, metaTitle, metaDesc)
-                .then(async (aiTags) => {
-                  if (aiTags.length > 0) {
-                    await db
-                      .update(bookmarks)
-                      .set({ tags: aiTags, updatedAt: new Date() })
-                      .where(eq(bookmarks.id, inserted.id));
-                    logger.info("Auto-tags generated", { url, tags: aiTags });
-                  }
-                })
-                .catch((err) => {
-                  logger.error("Auto-tagging error", {
-                    url,
-                    error: err instanceof Error ? err.message : String(err),
-                  });
+              })
+              .catch((err) => {
+                logger.error("Classification error", {
+                  url,
+                  error: err instanceof Error ? err.message : String(err),
                 });
-            }
+              });
           }
         } catch (error) {
           logger.error("Failed to save bookmark", { url, error });
