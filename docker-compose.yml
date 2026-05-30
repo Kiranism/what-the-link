@@ -11,6 +11,7 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - OPENROUTER_CHAT_MODEL=${OPENROUTER_CHAT_MODEL:-}
       - OPENROUTER_EMBEDDING_MODEL=${OPENROUTER_EMBEDDING_MODEL:-}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
     volumes:
       - ./data:/data
     restart: unless-stopped

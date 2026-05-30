@@ -145,6 +145,10 @@ Your app is now live at `https://yourdomain.com`.
 | `WA_AUTH_DIR` | No | `/data/whatsapp_auth` | WhatsApp session storage |
 | `NODE_ENV` | No | `production` | Environment mode |
 | `WA_ALLOWED_GROUP_JID` | No | — | Limit bookmarks to one WhatsApp group |
+| `OPENROUTER_API_KEY` | No | — | Enables AI summaries, tags, embeddings, smart search, shop classification |
+| `OPENROUTER_CHAT_MODEL` | No | `google/gemini-2.5-flash-lite` | Override chat model |
+| `OPENROUTER_EMBEDDING_MODEL` | No | `google/gemini-embedding-001` | Override embedding model |
+| `FIRECRAWL_API_KEY` | No | — | When set, Firecrawl becomes the primary URL fetcher (cheerio drops to fallback). Required for indie-store shop detection. |
 
 All can be set in `.env` or passed via `docker compose`:
 
