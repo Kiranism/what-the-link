@@ -206,6 +206,13 @@ export async function reconnectWhatsApp(): Promise<void> {
   if (!res.ok) throw new Error("Failed to reconnect");
 }
 
+export async function disconnectWhatsApp(): Promise<void> {
+  const res = await authFetch(`${API_BASE}/whatsapp/disconnect`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to disconnect");
+}
+
 export async function getWhatsAppQR(): Promise<{
   qr: string | null;
   connected: boolean;

@@ -151,6 +151,7 @@ export async function initWhatsApp(): Promise<void> {
     version,
     printQRInTerminal: false,
   });
+  const thisSock = sock;
 
   const allowedJid = getAllowedGroupJid();
   if (allowedJid) {
@@ -160,6 +161,8 @@ export async function initWhatsApp(): Promise<void> {
   }
 
   sock.ev.on("connection.update", async (update) => {
+    // Ignore events from a socket that has been replaced by a newer one
+    if (sock !== null && sock !== thisSock) return;
     const { connection, lastDisconnect, qr: qrData } = update;
 
     if (qrData) {
@@ -174,6 +177,9 @@ export async function initWhatsApp(): Promise<void> {
     if (connection === "close") {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
       lastDisconnectCode = statusCode;
+      // The socket is closed no matter why — never keep reporting "connected"
+      isConnected = false;
+      phoneNumber = undefined;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
       const isConnectionReplaced = statusCode === DisconnectReason.connectionReplaced;
       const shouldReconnect = !isLoggedOut && !isConnectionReplaced;
@@ -205,10 +211,12 @@ export async function initWhatsApp(): Promise<void> {
       if (shouldReconnect || isLoggedOut) {
         const delayMs =
           statusCode === 405 ? RECONNECT_DELAY_405_MS : RECONNECT_DELAY_MS;
-        setTimeout(() => reconnect(), delayMs);
+        setTimeout(() => {
+          // A newer socket exists (manual reconnect happened) — leave it alone
+          if (sock !== null && sock !== thisSock) return;
+          reconnect();
+        }, delayMs);
       } else {
-        isConnected = false;
-        phoneNumber = undefined;
         qrCode = null;
       }
     } else if (connection === "open") {
@@ -573,15 +581,33 @@ export async function refreshWhatsAppGroups(): Promise<WhatsAppGroup[]> {
 }
 
 export async function disconnectWhatsApp(): Promise<void> {
-  if (sock) {
-    await sock.logout();
-    sock = null;
-    isConnected = false;
-    phoneNumber = undefined;
-    qrCode = null;
+  const previousSock = sock;
+  sock = null;
+  isConnected = false;
+  phoneNumber = undefined;
+  qrCode = null;
+  if (previousSock) {
+    try {
+      await previousSock.logout();
+    } catch (e) {
+      // Socket may already be dead (e.g. device was removed from the phone)
+      logger.warn("WhatsApp logout failed, discarding session anyway", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+    try {
+      (previousSock as any).end?.(undefined);
+    } catch {}
   }
   // Clear auth so next init generates a fresh QR
   try {
     fs.rmSync(AUTH_DIR, { recursive: true, force: true });
   } catch {}
+  // Start a fresh socket right away so a new QR is ready to scan
+  await initWhatsApp();
+}
+
+/** End any existing socket and start a fresh one (regenerates the QR). */
+export async function reconnectWhatsApp(): Promise<void> {
+  await reconnect();
 }

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCcwIcon, SmartphoneIcon } from "lucide-react";
+import { RefreshCcwIcon, SmartphoneIcon, UnplugIcon } from "lucide-react";
 
 import { Button } from "@bookmark/ui/components/button";
 import {
@@ -11,6 +11,7 @@ import {
 } from "@bookmark/ui/components/card";
 import { QRDisplay } from "../QRDisplay";
 import {
+  disconnectWhatsApp,
   getWhatsAppQR,
   getWhatsAppStatus,
   reconnectWhatsApp,
@@ -35,10 +36,15 @@ export function WhatsAppConnectionSettings() {
       queryClient.invalidateQueries({ queryKey: ["whatsapp"] });
     },
   });
+  const disconnectMutation = useMutation({
+    mutationFn: disconnectWhatsApp,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["whatsapp"] });
+    },
+  });
 
   const connected = status?.connected ?? qrData?.connected ?? false;
   const phoneNumber = status?.phoneNumber ?? qrData?.phoneNumber;
-  const showReconnect = status?.lastDisconnectCode === 440;
 
   return (
     <Card className="border-border/80 bg-card/80">
@@ -60,7 +66,18 @@ export function WhatsAppConnectionSettings() {
           message={qrData?.message}
         />
 
-        {showReconnect ? (
+        {connected ? (
+          <Button
+            variant="outline"
+            size="lg"
+            className="self-start"
+            onClick={() => disconnectMutation.mutate()}
+            disabled={disconnectMutation.isPending}
+          >
+            <UnplugIcon data-icon="inline-start" />
+            {disconnectMutation.isPending ? "Disconnecting…" : "Disconnect"}
+          </Button>
+        ) : (
           <Button
             variant="outline"
             size="lg"
@@ -69,9 +86,9 @@ export function WhatsAppConnectionSettings() {
             disabled={reconnectMutation.isPending}
           >
             <RefreshCcwIcon data-icon="inline-start" />
-            {reconnectMutation.isPending ? "Reconnecting\u2026" : "Generate a New QR"}
+            {reconnectMutation.isPending ? "Reconnecting…" : "Generate a New QR"}
           </Button>
-        ) : null}
+        )}
       </CardContent>
     </Card>
   );

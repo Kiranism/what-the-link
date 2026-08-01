@@ -1,5 +1,6 @@
 export {
   initWhatsApp,
+  reconnectWhatsApp,
   getQRCode,
   getConnectionStatus,
   getWhatsAppGroups,

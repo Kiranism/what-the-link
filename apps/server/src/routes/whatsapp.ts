@@ -3,7 +3,7 @@ import {
   getQRCode,
   getConnectionStatus,
   disconnectWhatsApp,
-  initWhatsApp,
+  reconnectWhatsApp,
 } from "../services/whatsapp";
 
 export const whatsappRouter = new Hono();
@@ -43,6 +43,6 @@ whatsappRouter.post("/disconnect", async (c) => {
 });
 
 whatsappRouter.post("/reconnect", async (c) => {
-  await initWhatsApp();
+  await reconnectWhatsApp();
   return c.json({ success: true });
 });
